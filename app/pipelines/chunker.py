@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from app.db.client import get_supabase
-from app.services.embedding import embed_batch
+from app.services.embedding import embed_batch, MODEL_NAME
 
 CHUNK_SIZE = 400        # characters per chunk
 CHUNK_OVERLAP = 80      # overlap between chunks
@@ -52,7 +52,7 @@ async def chunk_and_embed_entity(
             "chunk_index":      idx,
             "text":             chunk_text,
             "embedding":        embedding,
-            "embedding_model":  "text-embedding-3-small"
+            "embedding_model":  MODEL_NAME
         })
 
     # batch insert

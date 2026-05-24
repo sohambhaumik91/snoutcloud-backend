@@ -1,0 +1,3654 @@
+{
+  "generated_at": "2026-04-13",
+  "description": "Complete API schema for PawLog backend",
+  "stack": {
+    "framework": "FastAPI",
+    "db": "Supabase (Postgres + pgvector)",
+    "python": "3.12",
+    "pydantic": "v2"
+  },
+  "models": {
+    "AuthResponse": {
+      "description": "Response after successful authentication.",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "title": "User Id",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "requires_onboarding": {
+          "title": "Requires Onboarding",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "user_id",
+        "email",
+        "requires_onboarding"
+      ],
+      "title": "AuthResponse",
+      "type": "object"
+    },
+    "ClarificationAnswer": {
+      "properties": {
+        "document_id": {
+          "format": "uuid",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "answers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Answers",
+          "type": "object"
+        }
+      },
+      "required": [
+        "document_id",
+        "answers"
+      ],
+      "title": "ClarificationAnswer",
+      "type": "object"
+    },
+    "ConversationCreate": {
+      "properties": {
+        "dog_id": {
+          "format": "uuid",
+          "title": "Dog Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dog_id"
+      ],
+      "title": "ConversationCreate",
+      "type": "object"
+    },
+    "DocumentUploadResponse": {
+      "$defs": {
+        "DocType": {
+          "enum": [
+            "prescription",
+            "vaccine_certificate",
+            "lab_report",
+            "discharge_summary",
+            "observation_note",
+            "travel_note",
+            "excel_sheet",
+            "grooming_record",
+            "unknown"
+          ],
+          "title": "DocType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "document_id": {
+          "format": "uuid",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "dog_id": {
+          "format": "uuid",
+          "title": "Dog Id",
+          "type": "string"
+        },
+        "file_path": {
+          "title": "File Path",
+          "type": "string"
+        },
+        "doc_type": {
+          "$ref": "#/$defs/DocType"
+        },
+        "doc_type_confidence": {
+          "title": "Doc Type Confidence",
+          "type": "number"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "semantic_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Semantic Summary"
+        },
+        "ocr_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Text"
+        },
+        "clarification_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Clarification Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "document_id",
+        "dog_id",
+        "file_path",
+        "doc_type",
+        "doc_type_confidence",
+        "status"
+      ],
+      "title": "DocumentUploadResponse",
+      "type": "object"
+    },
+    "DogCreate": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "breed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Breed"
+        },
+        "dob": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dob"
+        },
+        "sex": {
+          "default": "unknown",
+          "title": "Sex",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DogCreate",
+      "type": "object"
+    },
+    "DogResponse": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "title": "User Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "breed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Breed"
+        },
+        "dob": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dob"
+        },
+        "sex": {
+          "title": "Sex",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "user_id",
+        "name",
+        "breed",
+        "dob",
+        "sex",
+        "created_at"
+      ],
+      "title": "DogResponse",
+      "type": "object"
+    },
+    "EpisodeCreate": {
+      "$defs": {
+        "EpisodeType": {
+          "enum": [
+            "illness",
+            "injury",
+            "surgery",
+            "routine",
+            "travel",
+            "behavioural",
+            "other"
+          ],
+          "title": "EpisodeType",
+          "type": "string"
+        }
+      },
+      "description": "Create health episode for a dog.",
+      "properties": {
+        "dog_id": {
+          "format": "uuid",
+          "title": "Dog Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "episode_type": {
+          "$ref": "#/$defs/EpisodeType"
+        },
+        "started_on": {
+          "format": "date",
+          "title": "Started On",
+          "type": "string"
+        },
+        "resolved_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved On"
+        },
+        "is_ongoing": {
+          "default": false,
+          "title": "Is Ongoing",
+          "type": "boolean"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "dog_id",
+        "label",
+        "episode_type",
+        "started_on"
+      ],
+      "title": "EpisodeCreate",
+      "type": "object"
+    },
+    "EpisodeResponse": {
+      "description": "Full episode details.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "dog_id": {
+          "format": "uuid",
+          "title": "Dog Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "episode_type": {
+          "title": "Episode Type",
+          "type": "string"
+        },
+        "started_on": {
+          "format": "date",
+          "title": "Started On",
+          "type": "string"
+        },
+        "resolved_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved On"
+        },
+        "is_ongoing": {
+          "title": "Is Ongoing",
+          "type": "boolean"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Summary"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "dog_id",
+        "label",
+        "episode_type",
+        "started_on",
+        "resolved_on",
+        "is_ongoing",
+        "summary",
+        "source",
+        "created_at"
+      ],
+      "title": "EpisodeResponse",
+      "type": "object"
+    },
+    "ExtractedEntity": {
+      "$defs": {
+        "EntityType": {
+          "enum": [
+            "prescription",
+            "vaccine",
+            "lab_result",
+            "observation",
+            "travel_event",
+            "diet_entry",
+            "weight_entry",
+            "procedure",
+            "media_moment",
+            "grooming_record",
+            "unknown"
+          ],
+          "title": "EntityType",
+          "type": "string"
+        },
+        "ExtractedTemporal": {
+          "properties": {
+            "year": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Year"
+            },
+            "month": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Month"
+            },
+            "day": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Day"
+            },
+            "precision": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/TemporalPrecision"
+                }
+              ],
+              "default": "unknown"
+            }
+          },
+          "title": "ExtractedTemporal",
+          "type": "object"
+        },
+        "TemporalPrecision": {
+          "enum": [
+            "day",
+            "month",
+            "year",
+            "approximate",
+            "unknown"
+          ],
+          "title": "TemporalPrecision",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "entity_type": {
+          "$ref": "#/$defs/EntityType"
+        },
+        "entity_subtype": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entity Subtype"
+        },
+        "temporal": {
+          "$ref": "#/$defs/ExtractedTemporal"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period Start"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period End"
+        },
+        "location_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Name"
+        },
+        "location_lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Lat"
+        },
+        "location_lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Lng"
+        },
+        "data": {
+          "title": "Data",
+          "type": "object"
+        },
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "entity_type"
+      ],
+      "title": "ExtractedEntity",
+      "type": "object"
+    },
+    "ExtractedTemporal": {
+      "$defs": {
+        "TemporalPrecision": {
+          "enum": [
+            "day",
+            "month",
+            "year",
+            "approximate",
+            "unknown"
+          ],
+          "title": "TemporalPrecision",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Year"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Month"
+        },
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Day"
+        },
+        "precision": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TemporalPrecision"
+            }
+          ],
+          "default": "unknown"
+        }
+      },
+      "title": "ExtractedTemporal",
+      "type": "object"
+    },
+    "ExtractionPayload": {
+      "$defs": {
+        "DocType": {
+          "enum": [
+            "prescription",
+            "vaccine_certificate",
+            "lab_report",
+            "discharge_summary",
+            "observation_note",
+            "travel_note",
+            "excel_sheet",
+            "grooming_record",
+            "unknown"
+          ],
+          "title": "DocType",
+          "type": "string"
+        },
+        "EntityType": {
+          "enum": [
+            "prescription",
+            "vaccine",
+            "lab_result",
+            "observation",
+            "travel_event",
+            "diet_entry",
+            "weight_entry",
+            "procedure",
+            "media_moment",
+            "grooming_record",
+            "unknown"
+          ],
+          "title": "EntityType",
+          "type": "string"
+        },
+        "ExtractedEntity": {
+          "properties": {
+            "entity_type": {
+              "$ref": "#/$defs/EntityType"
+            },
+            "entity_subtype": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Entity Subtype"
+            },
+            "temporal": {
+              "$ref": "#/$defs/ExtractedTemporal"
+            },
+            "period_start": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Period Start"
+            },
+            "period_end": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Period End"
+            },
+            "location_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Name"
+            },
+            "location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Lat"
+            },
+            "location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Lng"
+            },
+            "data": {
+              "title": "Data",
+              "type": "object"
+            },
+            "confidence": {
+              "default": 1.0,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          "required": [
+            "entity_type"
+          ],
+          "title": "ExtractedEntity",
+          "type": "object"
+        },
+        "ExtractedTemporal": {
+          "properties": {
+            "year": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Year"
+            },
+            "month": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Month"
+            },
+            "day": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Day"
+            },
+            "precision": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/TemporalPrecision"
+                }
+              ],
+              "default": "unknown"
+            }
+          },
+          "title": "ExtractedTemporal",
+          "type": "object"
+        },
+        "TemporalPrecision": {
+          "enum": [
+            "day",
+            "month",
+            "year",
+            "approximate",
+            "unknown"
+          ],
+          "title": "TemporalPrecision",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "doc_type": {
+          "$ref": "#/$defs/DocType"
+        },
+        "doc_type_confidence": {
+          "title": "Doc Type Confidence",
+          "type": "number"
+        },
+        "semantic_summary": {
+          "title": "Semantic Summary",
+          "type": "string"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/ExtractedEntity"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "episode_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Episode Hint"
+        },
+        "clarification_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Clarification Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "doc_type",
+        "doc_type_confidence",
+        "semantic_summary",
+        "entities"
+      ],
+      "title": "ExtractionPayload",
+      "type": "object"
+    },
+    "GraphEdgeCreate": {
+      "description": "Create relationship in GraphRAG.",
+      "properties": {
+        "from_type": {
+          "title": "From Type",
+          "type": "string"
+        },
+        "from_id": {
+          "format": "uuid",
+          "title": "From Id",
+          "type": "string"
+        },
+        "relation": {
+          "title": "Relation",
+          "type": "string"
+        },
+        "to_type": {
+          "title": "To Type",
+          "type": "string"
+        },
+        "to_id": {
+          "format": "uuid",
+          "title": "To Id",
+          "type": "string"
+        },
+        "weight": {
+          "default": 1.0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "from_type",
+        "from_id",
+        "relation",
+        "to_type",
+        "to_id"
+      ],
+      "title": "GraphEdgeCreate",
+      "type": "object"
+    },
+    "GraphEdgeResponse": {
+      "description": "Graph edge details.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "from_type": {
+          "title": "From Type",
+          "type": "string"
+        },
+        "from_id": {
+          "format": "uuid",
+          "title": "From Id",
+          "type": "string"
+        },
+        "relation": {
+          "title": "Relation",
+          "type": "string"
+        },
+        "to_type": {
+          "title": "To Type",
+          "type": "string"
+        },
+        "to_id": {
+          "format": "uuid",
+          "title": "To Id",
+          "type": "string"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from_type",
+        "from_id",
+        "relation",
+        "to_type",
+        "to_id",
+        "weight",
+        "source",
+        "created_at"
+      ],
+      "title": "GraphEdgeResponse",
+      "type": "object"
+    },
+    "MessageRequest": {
+      "properties": {
+        "conversation_id": {
+          "format": "uuid",
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "content"
+      ],
+      "title": "MessageRequest",
+      "type": "object"
+    },
+    "MessageResponse": {
+      "properties": {
+        "conversation_id": {
+          "format": "uuid",
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "turn_id": {
+          "format": "uuid",
+          "title": "Turn Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "retrieved_entities": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Retrieved Entities",
+          "type": "array"
+        },
+        "retrieved_documents": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Retrieved Documents",
+          "type": "array"
+        },
+        "confirmed_absent": {
+          "title": "Confirmed Absent",
+          "type": "object"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "turn_id",
+        "role",
+        "content"
+      ],
+      "title": "MessageResponse",
+      "type": "object"
+    },
+    "OnboardingCompleteResponse": {
+      "$defs": {
+        "UserResponse": {
+          "description": "Full user profile response.",
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "email": {
+              "title": "Email",
+              "type": "string"
+            },
+            "is_owner": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Is Owner"
+            },
+            "roles": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Roles",
+              "type": "array"
+            },
+            "experience_level": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Experience Level"
+            },
+            "primary_use": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Primary Use"
+            },
+            "location_address": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Address"
+            },
+            "location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Lat"
+            },
+            "location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location Lng"
+            },
+            "org_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Org Name"
+            },
+            "org_location_address": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Org Location Address"
+            },
+            "org_location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Org Location Lat"
+            },
+            "org_location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Org Location Lng"
+            },
+            "data_sharing_preference": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Data Sharing Preference"
+            },
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "UserResponse",
+          "type": "object"
+        }
+      },
+      "description": "Response after onboarding completion.",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/$defs/UserResponse"
+        }
+      },
+      "required": [
+        "status",
+        "user"
+      ],
+      "title": "OnboardingCompleteResponse",
+      "type": "object"
+    },
+    "SearchQuery": {
+      "description": "Hybrid search query.",
+      "properties": {
+        "dog_id": {
+          "format": "uuid",
+          "title": "Dog Id",
+          "type": "string"
+        },
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "filters": {
+          "title": "Filters",
+          "type": "object"
+        },
+        "limit": {
+          "default": 10,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dog_id",
+        "query"
+      ],
+      "title": "SearchQuery",
+      "type": "object"
+    },
+    "SearchResult": {
+      "description": "Search result item.",
+      "properties": {
+        "entity_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entity Id"
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entity Type"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "data": {
+          "title": "Data",
+          "type": "object"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "score",
+        "data",
+        "source"
+      ],
+      "title": "SearchResult",
+      "type": "object"
+    },
+    "UserOnboarding": {
+      "$defs": {
+        "UserDataSharingPreference": {
+          "enum": [
+            "private",
+            "org",
+            "public"
+          ],
+          "title": "UserDataSharingPreference",
+          "type": "string"
+        },
+        "UserExperienceLevel": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "UserExperienceLevel",
+          "type": "string"
+        },
+        "UserPrimaryUse": {
+          "enum": [
+            "health_tracking",
+            "operations",
+            "casual"
+          ],
+          "title": "UserPrimaryUse",
+          "type": "string"
+        },
+        "UserRole": {
+          "enum": [
+            "veterinarian",
+            "groomer",
+            "nutritionist",
+            "trainer",
+            "rescue_worker",
+            "other"
+          ],
+          "title": "UserRole",
+          "type": "string"
+        }
+      },
+      "description": "Onboarding data collected from user after OAuth.",
+      "properties": {
+        "is_owner": {
+          "title": "Is Owner",
+          "type": "boolean"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/UserRole"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "experience_level": {
+          "$ref": "#/$defs/UserExperienceLevel"
+        },
+        "primary_use": {
+          "$ref": "#/$defs/UserPrimaryUse"
+        },
+        "location_address": {
+          "title": "Location Address",
+          "type": "string"
+        },
+        "location_lat": {
+          "title": "Location Lat",
+          "type": "number"
+        },
+        "location_lng": {
+          "title": "Location Lng",
+          "type": "number"
+        },
+        "org_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Name"
+        },
+        "org_location_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Address"
+        },
+        "org_location_lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Lat"
+        },
+        "org_location_lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Lng"
+        },
+        "data_sharing_preference": {
+          "$ref": "#/$defs/UserDataSharingPreference"
+        }
+      },
+      "required": [
+        "is_owner",
+        "roles",
+        "experience_level",
+        "primary_use",
+        "location_address",
+        "location_lat",
+        "location_lng",
+        "data_sharing_preference"
+      ],
+      "title": "UserOnboarding",
+      "type": "object"
+    },
+    "UserResponse": {
+      "description": "Full user profile response.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "is_owner": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Owner"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "experience_level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Experience Level"
+        },
+        "primary_use": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Use"
+        },
+        "location_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Address"
+        },
+        "location_lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Lat"
+        },
+        "location_lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Lng"
+        },
+        "org_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Name"
+        },
+        "org_location_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Address"
+        },
+        "org_location_lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Lat"
+        },
+        "org_location_lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org Location Lng"
+        },
+        "data_sharing_preference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Sharing Preference"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "UserResponse",
+      "type": "object"
+    }
+  },
+  "routes": [
+    {
+      "path": "/openapi.json",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "openapi"
+    },
+    {
+      "path": "/docs",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_html"
+    },
+    {
+      "path": "/docs/oauth2-redirect",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_redirect"
+    },
+    {
+      "path": "/redoc",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "redoc_html"
+    },
+    {
+      "path": "/auth/sync-user",
+      "methods": [
+        "POST"
+      ],
+      "name": "sync_user"
+    },
+    {
+      "path": "/auth/users/me",
+      "methods": [
+        "PATCH"
+      ],
+      "name": "update_user_onboarding"
+    },
+    {
+      "path": "/auth/users/me",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_current_user"
+    },
+    {
+      "path": "/documents/upload",
+      "methods": [
+        "POST"
+      ],
+      "name": "upload_document"
+    },
+    {
+      "path": "/documents/{document_id}/stream",
+      "methods": [
+        "GET"
+      ],
+      "name": "stream_document_status"
+    },
+    {
+      "path": "/documents/{document_id}/status",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_document_status"
+    },
+    {
+      "path": "/dogs",
+      "methods": [
+        "POST"
+      ],
+      "name": "create_dog"
+    },
+    {
+      "path": "/dogs",
+      "methods": [
+        "GET"
+      ],
+      "name": "list_dogs"
+    },
+    {
+      "path": "/dogs/{dog_id}",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_dog"
+    },
+    {
+      "path": "/dogs/{dog_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "name": "update_dog"
+    },
+    {
+      "path": "/dogs/{dog_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "name": "delete_dog"
+    },
+    {
+      "path": "/episodes",
+      "methods": [
+        "POST"
+      ],
+      "name": "create_episode"
+    },
+    {
+      "path": "/episodes",
+      "methods": [
+        "GET"
+      ],
+      "name": "list_episodes"
+    },
+    {
+      "path": "/episodes/{episode_id}",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_episode"
+    },
+    {
+      "path": "/episodes/{episode_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "name": "update_episode"
+    },
+    {
+      "path": "/conversations",
+      "methods": [
+        "POST"
+      ],
+      "name": "create_conversation"
+    },
+    {
+      "path": "/conversations/{conversation_id}",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_conversation"
+    },
+    {
+      "path": "/conversations/{conversation_id}/message",
+      "methods": [
+        "POST"
+      ],
+      "name": "send_message"
+    },
+    {
+      "path": "/health",
+      "methods": [
+        "GET"
+      ],
+      "name": "health"
+    }
+  ],
+  "openapi": {
+    "openapi": "3.1.0",
+    "info": {
+      "title": "PawLog API",
+      "description": "Dog health memory \u2014 GraphRAG backend",
+      "version": "0.1.0"
+    },
+    "paths": {
+      "/auth/sync-user": {
+        "post": {
+          "tags": [
+            "auth"
+          ],
+          "summary": "Sync User",
+          "description": "Called by frontend immediately after successful OAuth.\nCreates a users row if it doesn't exist.\nReturns whether onboarding is required.\n\nExpected flow:\n1. Frontend completes OAuth with Supabase JS SDK\n2. Frontend calls POST /auth/sync-user with Authorization header\n3. Backend creates users row (id, email)\n4. Backend returns { requires_onboarding: bool }\n5. Frontend routes to onboarding if required, else to dashboard\n\nRequires: Authorization header with Supabase session token",
+          "operationId": "sync_user_auth_sync_user_post",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/AuthResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/users/me": {
+        "patch": {
+          "tags": [
+            "auth"
+          ],
+          "summary": "Update User Onboarding",
+          "description": "Update user with onboarding data.\nCalled when user completes the 4-screen onboarding stepper.\n\nRequires: Authorization header with Supabase session token",
+          "operationId": "update_user_onboarding_auth_users_me_patch",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOnboarding"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/OnboardingCompleteResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "tags": [
+            "auth"
+          ],
+          "summary": "Get Current User",
+          "description": "Get current user profile.\n\nRequires: Authorization header with Supabase session token",
+          "operationId": "get_current_user_auth_users_me_get",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/documents/upload": {
+        "post": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Upload Document",
+          "description": "Upload a document for a dog.\nImmediately returns document_id and storage path.\nPipeline (OCR \u2192 extraction \u2192 embedding) runs in the background.\nSubscribe to GET /documents/{id}/stream to receive the completion event.",
+          "operationId": "upload_document_documents_upload_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_upload_document_documents_upload_post"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DocumentUploadResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/documents/{document_id}/stream": {
+        "get": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Stream Document Status",
+          "description": "SSE endpoint \u2014 pushes exactly one event when the ingest pipeline finishes.\n\nIf the pipeline already completed before the client connected, responds\nimmediately from the DB (no Redis subscription needed).\n\nEvent payload:\n  { status: \"done\" | \"failed\" | \"timeout\",\n    doc_type, doc_type_confidence, summary, entity_count }",
+          "operationId": "stream_document_status_documents__document_id__stream_get",
+          "parameters": [
+            {
+              "name": "document_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Document Id"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/documents/{document_id}/status": {
+        "get": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Get Document Status",
+          "description": "Poll pipeline status for a document.",
+          "operationId": "get_document_status_documents__document_id__status_get",
+          "parameters": [
+            {
+              "name": "document_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Document Id"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/dogs": {
+        "post": {
+          "tags": [
+            "dogs"
+          ],
+          "summary": "Create Dog",
+          "description": "Create a new dog for the current user.",
+          "operationId": "create_dog_dogs_post",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DogCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DogResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "tags": [
+            "dogs"
+          ],
+          "summary": "List Dogs",
+          "description": "List all dogs for the current user.",
+          "operationId": "list_dogs_dogs_get",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DogResponse"
+                    },
+                    "title": "Response List Dogs Dogs Get"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/dogs/{dog_id}": {
+        "get": {
+          "tags": [
+            "dogs"
+          ],
+          "summary": "Get Dog",
+          "description": "Get details for a specific dog.",
+          "operationId": "get_dog_dogs__dog_id__get",
+          "parameters": [
+            {
+              "name": "dog_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Dog Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DogResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "patch": {
+          "tags": [
+            "dogs"
+          ],
+          "summary": "Update Dog",
+          "description": "Update dog details.",
+          "operationId": "update_dog_dogs__dog_id__patch",
+          "parameters": [
+            {
+              "name": "dog_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Dog Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DogCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DogResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "delete": {
+          "tags": [
+            "dogs"
+          ],
+          "summary": "Delete Dog",
+          "description": "Delete a dog.",
+          "operationId": "delete_dog_dogs__dog_id__delete",
+          "parameters": [
+            {
+              "name": "dog_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Dog Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/episodes": {
+        "post": {
+          "tags": [
+            "episodes"
+          ],
+          "summary": "Create Episode",
+          "description": "Create a health episode for a dog.",
+          "operationId": "create_episode_episodes_post",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/EpisodeResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "tags": [
+            "episodes"
+          ],
+          "summary": "List Episodes",
+          "description": "List episodes for a dog (or all user's dogs if dog_id not specified).",
+          "operationId": "list_episodes_episodes_get",
+          "parameters": [
+            {
+              "name": "dog_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dog Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/EpisodeResponse"
+                    },
+                    "title": "Response List Episodes Episodes Get"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/episodes/{episode_id}": {
+        "get": {
+          "tags": [
+            "episodes"
+          ],
+          "summary": "Get Episode",
+          "description": "Get a specific episode.",
+          "operationId": "get_episode_episodes__episode_id__get",
+          "parameters": [
+            {
+              "name": "episode_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Episode Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/EpisodeResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "patch": {
+          "tags": [
+            "episodes"
+          ],
+          "summary": "Update Episode",
+          "description": "Update an episode.",
+          "operationId": "update_episode_episodes__episode_id__patch",
+          "parameters": [
+            {
+              "name": "episode_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Episode Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/EpisodeResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/conversations": {
+        "post": {
+          "tags": [
+            "conversations"
+          ],
+          "summary": "Create Conversation",
+          "description": "Create a new conversation for a dog.",
+          "operationId": "create_conversation_conversations_post",
+          "parameters": [
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "title": "Response Create Conversation Conversations Post"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/conversations/{conversation_id}": {
+        "get": {
+          "tags": [
+            "conversations"
+          ],
+          "summary": "Get Conversation",
+          "description": "Get conversation history.",
+          "operationId": "get_conversation_conversations__conversation_id__get",
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Conversation Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/conversations/{conversation_id}/message": {
+        "post": {
+          "tags": [
+            "conversations"
+          ],
+          "summary": "Send Message",
+          "description": "Send a message in a conversation.\n\nTODO: Implement hybrid search (vector + structured)\nTODO: Call Claude with context from entity_store\nTODO: Store turn with retrieved entities/documents",
+          "operationId": "send_message_conversations__conversation_id__message_post",
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "title": "Conversation Id"
+              }
+            },
+            {
+              "name": "authorization",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "title": "Authorization"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/MessageResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/health": {
+        "get": {
+          "summary": "Health",
+          "operationId": "health_health_get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "AuthResponse": {
+          "properties": {
+            "status": {
+              "type": "string",
+              "title": "Status"
+            },
+            "user_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            },
+            "email": {
+              "type": "string",
+              "title": "Email"
+            },
+            "requires_onboarding": {
+              "type": "boolean",
+              "title": "Requires Onboarding"
+            }
+          },
+          "type": "object",
+          "required": [
+            "status",
+            "user_id",
+            "email",
+            "requires_onboarding"
+          ],
+          "title": "AuthResponse",
+          "description": "Response after successful authentication."
+        },
+        "Body_upload_document_documents_upload_post": {
+          "properties": {
+            "dog_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dog Id"
+            },
+            "user_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            },
+            "file": {
+              "type": "string",
+              "format": "binary",
+              "title": "File"
+            }
+          },
+          "type": "object",
+          "required": [
+            "dog_id",
+            "user_id",
+            "file"
+          ],
+          "title": "Body_upload_document_documents_upload_post"
+        },
+        "ConversationCreate": {
+          "properties": {
+            "dog_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dog Id"
+            }
+          },
+          "type": "object",
+          "required": [
+            "dog_id"
+          ],
+          "title": "ConversationCreate"
+        },
+        "DocType": {
+          "type": "string",
+          "enum": [
+            "prescription",
+            "vaccine_certificate",
+            "lab_report",
+            "discharge_summary",
+            "observation_note",
+            "travel_note",
+            "excel_sheet",
+            "grooming_record",
+            "unknown"
+          ],
+          "title": "DocType"
+        },
+        "DocumentUploadResponse": {
+          "properties": {
+            "document_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            },
+            "dog_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dog Id"
+            },
+            "file_path": {
+              "type": "string",
+              "title": "File Path"
+            },
+            "doc_type": {
+              "$ref": "#/components/schemas/DocType"
+            },
+            "doc_type_confidence": {
+              "type": "number",
+              "title": "Doc Type Confidence"
+            },
+            "status": {
+              "type": "string",
+              "title": "Status"
+            },
+            "semantic_summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semantic Summary"
+            },
+            "ocr_text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ocr Text"
+            },
+            "clarification_questions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "title": "Clarification Questions"
+            }
+          },
+          "type": "object",
+          "required": [
+            "document_id",
+            "dog_id",
+            "file_path",
+            "doc_type",
+            "doc_type_confidence",
+            "status"
+          ],
+          "title": "DocumentUploadResponse"
+        },
+        "DogCreate": {
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "breed": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Breed"
+            },
+            "dob": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dob"
+            },
+            "sex": {
+              "type": "string",
+              "title": "Sex",
+              "default": "unknown"
+            }
+          },
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "title": "DogCreate"
+        },
+        "DogResponse": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            },
+            "user_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            },
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "breed": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Breed"
+            },
+            "dob": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dob"
+            },
+            "sex": {
+              "type": "string",
+              "title": "Sex"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Created At"
+            }
+          },
+          "type": "object",
+          "required": [
+            "id",
+            "user_id",
+            "name",
+            "breed",
+            "dob",
+            "sex",
+            "created_at"
+          ],
+          "title": "DogResponse"
+        },
+        "EpisodeCreate": {
+          "properties": {
+            "dog_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dog Id"
+            },
+            "label": {
+              "type": "string",
+              "title": "Label"
+            },
+            "episode_type": {
+              "$ref": "#/components/schemas/EpisodeType"
+            },
+            "started_on": {
+              "type": "string",
+              "format": "date",
+              "title": "Started On"
+            },
+            "resolved_on": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resolved On"
+            },
+            "is_ongoing": {
+              "type": "boolean",
+              "title": "Is Ongoing",
+              "default": false
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Summary"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          "type": "object",
+          "required": [
+            "dog_id",
+            "label",
+            "episode_type",
+            "started_on"
+          ],
+          "title": "EpisodeCreate",
+          "description": "Create health episode for a dog."
+        },
+        "EpisodeResponse": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            },
+            "dog_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dog Id"
+            },
+            "label": {
+              "type": "string",
+              "title": "Label"
+            },
+            "episode_type": {
+              "type": "string",
+              "title": "Episode Type"
+            },
+            "started_on": {
+              "type": "string",
+              "format": "date",
+              "title": "Started On"
+            },
+            "resolved_on": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resolved On"
+            },
+            "is_ongoing": {
+              "type": "boolean",
+              "title": "Is Ongoing"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Summary"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Created At"
+            }
+          },
+          "type": "object",
+          "required": [
+            "id",
+            "dog_id",
+            "label",
+            "episode_type",
+            "started_on",
+            "resolved_on",
+            "is_ongoing",
+            "summary",
+            "source",
+            "created_at"
+          ],
+          "title": "EpisodeResponse",
+          "description": "Full episode details."
+        },
+        "EpisodeType": {
+          "type": "string",
+          "enum": [
+            "illness",
+            "injury",
+            "surgery",
+            "routine",
+            "travel",
+            "behavioural",
+            "other"
+          ],
+          "title": "EpisodeType"
+        },
+        "HTTPValidationError": {
+          "properties": {
+            "detail": {
+              "items": {
+                "$ref": "#/components/schemas/ValidationError"
+              },
+              "type": "array",
+              "title": "Detail"
+            }
+          },
+          "type": "object",
+          "title": "HTTPValidationError"
+        },
+        "MessageRequest": {
+          "properties": {
+            "conversation_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            },
+            "content": {
+              "type": "string",
+              "title": "Content"
+            }
+          },
+          "type": "object",
+          "required": [
+            "conversation_id",
+            "content"
+          ],
+          "title": "MessageRequest"
+        },
+        "MessageResponse": {
+          "properties": {
+            "conversation_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            },
+            "turn_id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            },
+            "role": {
+              "type": "string",
+              "title": "Role"
+            },
+            "content": {
+              "type": "string",
+              "title": "Content"
+            },
+            "retrieved_entities": {
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": "array",
+              "title": "Retrieved Entities"
+            },
+            "retrieved_documents": {
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": "array",
+              "title": "Retrieved Documents"
+            },
+            "confirmed_absent": {
+              "type": "object",
+              "title": "Confirmed Absent"
+            }
+          },
+          "type": "object",
+          "required": [
+            "conversation_id",
+            "turn_id",
+            "role",
+            "content"
+          ],
+          "title": "MessageResponse"
+        },
+        "OnboardingCompleteResponse": {
+          "properties": {
+            "status": {
+              "type": "string",
+              "title": "Status"
+            },
+            "user": {
+              "$ref": "#/components/schemas/UserResponse"
+            }
+          },
+          "type": "object",
+          "required": [
+            "status",
+            "user"
+          ],
+          "title": "OnboardingCompleteResponse",
+          "description": "Response after onboarding completion."
+        },
+        "UserDataSharingPreference": {
+          "type": "string",
+          "enum": [
+            "private",
+            "org",
+            "public"
+          ],
+          "title": "UserDataSharingPreference"
+        },
+        "UserExperienceLevel": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "UserExperienceLevel"
+        },
+        "UserOnboarding": {
+          "properties": {
+            "is_owner": {
+              "type": "boolean",
+              "title": "Is Owner"
+            },
+            "roles": {
+              "items": {
+                "$ref": "#/components/schemas/UserRole"
+              },
+              "type": "array",
+              "title": "Roles"
+            },
+            "experience_level": {
+              "$ref": "#/components/schemas/UserExperienceLevel"
+            },
+            "primary_use": {
+              "$ref": "#/components/schemas/UserPrimaryUse"
+            },
+            "location_address": {
+              "type": "string",
+              "title": "Location Address"
+            },
+            "location_lat": {
+              "type": "number",
+              "title": "Location Lat"
+            },
+            "location_lng": {
+              "type": "number",
+              "title": "Location Lng"
+            },
+            "org_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Name"
+            },
+            "org_location_address": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Address"
+            },
+            "org_location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Lat"
+            },
+            "org_location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Lng"
+            },
+            "data_sharing_preference": {
+              "$ref": "#/components/schemas/UserDataSharingPreference"
+            }
+          },
+          "type": "object",
+          "required": [
+            "is_owner",
+            "roles",
+            "experience_level",
+            "primary_use",
+            "location_address",
+            "location_lat",
+            "location_lng",
+            "data_sharing_preference"
+          ],
+          "title": "UserOnboarding",
+          "description": "Onboarding data collected from user after OAuth."
+        },
+        "UserPrimaryUse": {
+          "type": "string",
+          "enum": [
+            "health_tracking",
+            "operations",
+            "casual"
+          ],
+          "title": "UserPrimaryUse"
+        },
+        "UserResponse": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            },
+            "email": {
+              "type": "string",
+              "title": "Email"
+            },
+            "is_owner": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Owner"
+            },
+            "roles": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "title": "Roles"
+            },
+            "experience_level": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Experience Level"
+            },
+            "primary_use": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Primary Use"
+            },
+            "location_address": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Location Address"
+            },
+            "location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Location Lat"
+            },
+            "location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Location Lng"
+            },
+            "org_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Name"
+            },
+            "org_location_address": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Address"
+            },
+            "org_location_lat": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Lat"
+            },
+            "org_location_lng": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Org Location Lng"
+            },
+            "data_sharing_preference": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data Sharing Preference"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Created At"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Updated At"
+            }
+          },
+          "type": "object",
+          "required": [
+            "id",
+            "email",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "UserResponse",
+          "description": "Full user profile response."
+        },
+        "UserRole": {
+          "type": "string",
+          "enum": [
+            "veterinarian",
+            "groomer",
+            "nutritionist",
+            "trainer",
+            "rescue_worker",
+            "other"
+          ],
+          "title": "UserRole"
+        },
+        "ValidationError": {
+          "properties": {
+            "loc": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array",
+              "title": "Location"
+            },
+            "msg": {
+              "type": "string",
+              "title": "Message"
+            },
+            "type": {
+              "type": "string",
+              "title": "Error Type"
+            }
+          },
+          "type": "object",
+          "required": [
+            "loc",
+            "msg",
+            "type"
+          ],
+          "title": "ValidationError"
+        }
+      }
+    }
+  }
+}

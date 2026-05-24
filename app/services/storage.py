@@ -39,3 +39,14 @@ async def download_file(path: str) -> bytes:
     """Download file bytes — used by the OCR pipeline."""
     sb = get_supabase()
     return sb.storage.from_(settings.storage_bucket).download(path)
+
+
+def create_signed_upload_url(path: str, bucket: str) -> dict:
+    """Create a presigned upload URL the client can PUT a file to directly.
+
+    Returns the dict from storage3: {"signed_url", "token", "path"}.
+    The signed URL embeds a single-use upload token; the bucket itself can
+    remain private. Crops never pass through the FastAPI process.
+    """
+    sb = get_supabase()
+    return sb.storage.from_(bucket).create_signed_upload_url(path)
