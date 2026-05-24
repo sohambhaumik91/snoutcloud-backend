@@ -103,8 +103,8 @@ window, not the upload window.
   "presigned_urls": [
     {
       "index": 1,
-      "url": "https://<project>.supabase.co/storage/v1/object/upload/sign/snoutcloud/nose-crops/pending/<job_id>/crop_1.jpg?token=...",
-      "path": "nose-crops/pending/<job_id>/crop_1.jpg",
+      "url": "https://<project>.supabase.co/storage/v1/object/upload/sign/dog_nose_crops/private/nose-crops/pending/<job_id>/crop_1.jpg?token=...",
+      "path": "private/nose-crops/pending/<job_id>/crop_1.jpg",
       "token": "<upload-token>"
     },
     { "index": 2, "url": "...", "path": "...", "token": "..." },
@@ -137,7 +137,7 @@ window, not the upload window.
 {
   "embedding_job_id": "...",
   "presigned_urls": [
-    { "index": 1, "url": "...", "path": "nose-crops/<dog_id>/<job_id>/crop_1.jpg", "token": "..." },
+    { "index": 1, "url": "...", "path": "private/nose-crops/<dog_id>/<job_id>/crop_1.jpg", "token": "..." },
     ...
   ]
 }
@@ -182,13 +182,34 @@ window, not the upload window.
 
 ---
 
+## 3.4 Storage bucket reference
+
+- **Bucket name**: `dog_nose_crops` (private).
+- **Path prefix**: every object key starts with `private/...`. This is
+  required by the bucket's RLS policy:
+
+  ```
+  bucket_id = 'dog_nose_crops'
+    AND (storage.foldername(name))[1] = 'private'
+    AND auth.role() = 'authenticated'
+  ```
+
+  The backend already prepends `private/` to every path it returns, so you do
+  not need to add it yourself. **But**: if you ever construct a path on the
+  client (for direct `supabase.storage.from('dog_nose_crops').download(path)`
+  calls to show crops back to the user), that path must also start with
+  `private/`, and the user must be authenticated in `supabase-js` for the
+  RLS check to pass.
+
+---
+
 ## 4. Uploading crops to Supabase Storage
 
 The backend hands you signed *upload* URLs. Each entry in `presigned_urls`
 has three fields:
 
 - `url` — full signed URL (works with plain HTTP `PUT`).
-- `path` — the object key inside the `snoutcloud` bucket.
+- `path` — the object key inside the `dog_nose_crops` bucket.
 - `token` — the upload token, also embedded in `url`. Provided separately so
   you can use the Supabase JS SDK's `uploadToSignedUrl()` helper if you
   prefer it over raw `fetch`.
@@ -211,7 +232,7 @@ async function uploadCrop(presigned: { url: string }, blob: Blob) {
 ```ts
 await supabase
   .storage
-  .from('snoutcloud')
+  .from('dog_nose_crops')
   .uploadToSignedUrl(presigned.path, presigned.token, blob, {
     contentType: 'image/jpeg',
   })

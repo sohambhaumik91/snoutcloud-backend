@@ -25,6 +25,31 @@ the spec in `CLAUDE.md`.
 - The bucket can be private — the signed token authorises the single upload.
   No bucket policy changes are needed beyond creating the `snoutcloud` bucket.
 
+## Bucket name and RLS path requirement
+
+- Production bucket is **`dog_nose_crops`** (underscored), not `snoutcloud` as
+  drafted in the spec. Configurable via `settings.nose_crops_bucket`.
+- The bucket has an RLS policy that requires every object key to begin with
+  `private/...`:
+
+  ```
+  bucket_id = 'dog_nose_crops'
+    AND (storage.foldername(name))[1] = 'private'
+    AND auth.role() = 'authenticated'
+  ```
+
+  Because the service-role client bypasses RLS, the backend itself does not
+  need to satisfy this when *generating* the signed upload URL — but the
+  client's eventual `PUT` (and any direct-from-frontend reads) is evaluated
+  against this policy via the signed token's grant. To keep both paths
+  working we prepend the policy prefix on the server. The prefix lives in
+  `settings.nose_crops_prefix` (default `private`).
+- Resulting object keys:
+  - Enrollment:  `private/nose-crops/pending/{job_id}/crop_N.jpg`
+  - Rescan:      `private/nose-crops/{dog_id}/{job_id}/crop_N.jpg`
+- `embedding_jobs.storage_path` stores the full prefix (including `private/`)
+  so the downstream pipeline can list/download crops without re-deriving it.
+
 ## Service-role client behaviour
 
 - `app/db/client.py::get_supabase()` uses `SUPABASE_SERVICE_ROLE_KEY`, which
@@ -66,7 +91,8 @@ the spec in `CLAUDE.md`.
 |---|---|---|
 | JWKS RS256 verification | `verify_signature=False` (matches existing routes) | Single-route change should not introduce divergent auth behaviour |
 | Response shape `presigned_urls[].url` only | Added `token` field per crop | Required by Supabase JS SDK's `uploadToSignedUrl()` helper |
-| Bucket name in code | Lives in `settings.nose_crops_bucket` (default `"snoutcloud"`) | Keeps it separate from existing `dog-documents` bucket |
+| Bucket name in code | Lives in `settings.nose_crops_bucket` (default `"dog_nose_crops"`) | Keeps it separate from existing `dog-documents` bucket and matches the production bucket name |
+| Path prefix | Lives in `settings.nose_crops_prefix` (default `"private"`) | Required by the bucket's RLS policy: `(storage.foldername(name))[1] = 'private'` |
 | `embedding_jobs.embedding_version` on rescan insert | Left at default `1` at job start | Spec says version bumps on *completion*, not on job start; the pipeline (not the start endpoint) will increment it |
 
 ## Things to double-check before going live
@@ -77,5 +103,5 @@ the spec in `CLAUDE.md`.
    `/inference/start` with an enrollment job.
 2. `embedding_jobs.user_id` is required in the schema. The seed migrations
    should ensure that column exists with the NOT NULL constraint as expected.
-3. The `snoutcloud` storage bucket must be created in Supabase (private). The
-   API does not auto-create it.
+3. The `dog_nose_crops` storage bucket must exist in Supabase (private) with
+   the RLS policy described above. The API does not auto-create either.

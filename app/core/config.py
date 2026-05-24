@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str
 
     storage_bucket: str = "dog-documents"
-    nose_crops_bucket: str = "snoutcloud"
+    nose_crops_bucket: str = "dog_nose_crops"
+    # RLS policy on the dog_nose_crops bucket requires every object key to
+    # live under this top-level folder: (storage.foldername(name))[1] = 'private'
+    nose_crops_prefix: str = "private"
     embedding_dimensions: int = 384
 
     # presigned upload URLs: per Supabase, signed upload URLs expire ~2 hours

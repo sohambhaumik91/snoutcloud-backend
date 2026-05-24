@@ -52,7 +52,8 @@ async def start_registration(
 
     job_id = uuid4()
     registration_id = uuid4()
-    storage_path = f"nose-crops/pending/{job_id}"
+    # RLS on dog_nose_crops requires the first folder to be `private`
+    storage_path = f"{settings.nose_crops_prefix}/nose-crops/pending/{job_id}"
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(seconds=settings.registration_ttl_seconds)
 

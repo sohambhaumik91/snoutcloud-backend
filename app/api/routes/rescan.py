@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_current_user_id
 from app.api.routes.registration import _build_presigned_uploads
+from app.core.config import settings
 from app.core.models import (
     EmbeddingJobIntent,
     EmbeddingJobStatus,
@@ -49,7 +50,8 @@ async def start_rescan(
         raise HTTPException(status_code=403, detail="You do not own this dog")
 
     job_id = uuid4()
-    storage_path = f"nose-crops/{payload.dog_id}/{job_id}"
+    # RLS on dog_nose_crops requires the first folder to be `private`
+    storage_path = f"{settings.nose_crops_prefix}/nose-crops/{payload.dog_id}/{job_id}"
     now = datetime.now(timezone.utc)
 
     job_row = {
