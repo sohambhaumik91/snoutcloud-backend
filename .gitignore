@@ -156,3 +156,8 @@ Thumbs.db
 openapi.json
 schema_models.json
 schema_routes.json
+
+# Nose-encoder checkpoint — baked into the Docker image at build time, never
+# committed (too large for git, and >50MB Supabase upload cap rules out storage).
+*.pt
+models/*.pt

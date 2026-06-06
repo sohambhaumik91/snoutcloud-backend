@@ -1,23 +1,36 @@
 # Frontend Handoff — Nose Biometrics Enrollment & Rescan
 
 This document is everything a React Native / web client needs to integrate the
-three endpoints that are live today:
+nose-biometrics endpoints, all of which are live today:
 
 1. `POST /registration/start` — begin enrolling a new dog
 2. `POST /rescan/start` — re-upload nose crops for an existing dog
 3. `POST /inference/start` — trigger the embedding pipeline
+4. `GET /inference/status/{embedding_job_id}` — SSE live status stream
+5. `GET /inference/result/{embedding_job_id}` — polling fallback for dropped SSE
+6. `POST /inference/{embedding_job_id}/resolve` — commit human's enroll/duplicate decision
 
-> Status streaming (`GET /inference/status/{id}` SSE) and the result polling
-> endpoint (`GET /inference/result/{id}`) are described in `CLAUDE.md` but
-> are **not yet implemented**. Until they ship, treat `/inference/start` as
-> fire-and-forget and reconcile via direct Supabase reads (see "Reconciling
-> job state" below).
+> Inference runs in an always-on background worker; `/inference/start` returns
+> immediately. Subscribe to the SSE stream for live progress and fall back to
+> the result endpoint if the connection drops (see §7).
 
 ---
 
 ## 1. Base URL & Authentication
 
-**Base URL**: `https://<your-railway-service>.railway.app` (configure per env)
+**Base URL** (configure per environment):
+- **Local laptop server via ngrok:** the `https://<random>.ngrok-free.app` URL
+  printed at `http://localhost:4040` after `docker compose up`. It changes every
+  restart on the free tier — update the client's base URL each time, or use a
+  reserved ngrok domain.
+- **Railway:** `https://<your-railway-service>.railway.app`.
+
+> **ngrok-free gotcha:** the free tier injects a browser-warning interstitial on
+> requests that look like a browser. React Native `fetch`/`EventSource` normally
+> bypass it, but if you see an HTML warning page instead of JSON, add the header
+> `ngrok-skip-browser-warning: 1` to your `fetch` calls. (The SSE `EventSource`
+> can't set headers — if the stream returns HTML, switch to a reserved ngrok
+> domain or deploy to Railway.)
 
 Every request must include the Supabase access token in the `Authorization`
 header:
@@ -63,8 +76,9 @@ and retry the request once.
 │  3. POST /inference/start { embedding_job_id }                     │
 │     → { embedding_job_id, status: "processing" }                   │
 │                                                                    │
-│  4. (Future) Subscribe to SSE for live status; for now, poll the   │
-│     embedding_jobs row directly via Supabase to detect completion. │
+│  4. Subscribe to GET /inference/status/{embedding_job_id} (SSE)    │
+│     for live progress; fall back to GET /inference/result/{id}     │
+│     if the SSE connection drops.                                   │
 └────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────┐
@@ -135,6 +149,7 @@ window, not the upload window.
 
 ```json
 {
+  "registration_id": "...",
   "embedding_job_id": "...",
   "presigned_urls": [
     { "index": 1, "url": "...", "path": "private/nose-crops/<dog_id>/<job_id>/crop_1.jpg", "token": "..." },
@@ -142,6 +157,11 @@ window, not the upload window.
   ]
 }
 ```
+
+> A rescan now also creates a `registrations` row (one row per scan attempt,
+> tracked via `attempt_number`), so the response includes `registration_id` for
+> symmetry with enrollment. You generally only need `embedding_job_id` to drive
+> upload + inference + status.
 
 **Errors**:
 - `401` — missing/invalid JWT.
@@ -275,6 +295,7 @@ export interface RegistrationStartResponse {
 }
 
 export interface RescanStartResponse {
+  registration_id: string  // uuid
   embedding_job_id: string
   presigned_urls: PresignedUpload[]   // length 8
 }
@@ -283,6 +304,11 @@ export interface InferenceStartResponse {
   embedding_job_id: string
   status: 'processing'
 }
+
+// SSE events on GET /inference/status/{embedding_job_id}?token=<jwt>
+// event: status   → { status: 'processing', step: 'quality_check' | 'generating_embedding' | 'duplicate_check' | 'saving_results' | 'starting' }
+// event: complete → { status: 'complete', duplicate_found, duplicate_dog_id, match_score, dog_id, embedding_version }
+// event: error    → { status: 'failed', reason, notes? }
 ```
 
 ---
@@ -375,31 +401,65 @@ export async function rescanDog(dogId: string, crops: Blob[]) {
 
 ---
 
-## 7. Reconciling job state (until SSE ships)
+## 7. Live status (SSE) + polling fallback
 
-The SSE status stream and the result polling endpoint are not implemented yet.
-Until they are, query the `embedding_jobs` table directly with `supabase-js`
-to see what happened:
+### SSE — `GET /inference/status/{embedding_job_id}?token=<jwt>`
+
+`EventSource` in React Native can't set headers, so pass the Supabase access
+token as the `?token=` query param. The stream emits the current DB state on
+connect, then `status` step events, and closes on `complete` / `error`.
 
 ```ts
-const { data, error } = await supabase
-  .from('embedding_jobs')
-  .select('id, status, duplicate_found, duplicate_dog_id, match_score, completed_at')
-  .eq('id', embeddingJobId)
-  .single()
+const { data: { session } } = await supabase.auth.getSession()
+const es = new EventSource(
+  `${API_BASE}/inference/status/${embeddingJobId}?token=${session!.access_token}`
+)
+
+es.addEventListener('status', (e) => {
+  const { step } = JSON.parse(e.data)   // quality_check | generating_embedding | duplicate_check | saving_results
+  updateProgress(step)
+})
+
+es.addEventListener('complete', (e) => {
+  const r = JSON.parse(e.data)
+  es.close()
+  if (r.duplicate_found) showDuplicateScreen(r.duplicate_dog_id, r.match_score)
+  else showSuccess(r.dog_id, r.embedding_version)
+})
+
+es.addEventListener('error', (e) => {
+  es.close()
+  // If the connection (not the pipeline) dropped, fall back to the result endpoint.
+})
 ```
 
-Possible terminal `status` values:
-- `complete` — pipeline finished. Check `duplicate_found`. If true and
-  `intent === 'enrollment'`, route the user to the duplicate-resolution
-  screen with `duplicate_dog_id` and `match_score`.
-- `failed` — pipeline failed. The `embedding_jobs.quality_notes` JSONB column
-  will carry per-crop reasons once quality gating ships. Show a friendly
-  retry prompt.
+### Polling fallback — `GET /inference/result/{embedding_job_id}`
 
-While `status` is `processing`, poll every 2–3 seconds. Stop after ~60s and
-show a fallback "still working, you'll get a notification" message. The real
-SSE endpoint will replace this whole section once it ships.
+Auth via the normal `Authorization: Bearer` header. Returns the job's terminal
+fields. Use it if the SSE connection drops before `complete`:
+
+```json
+{
+  "embedding_job_id": "...",
+  "status": "complete | processing | failed",
+  "intent": "enrollment | rescan",
+  "dog_id": "uuid | null",
+  "duplicate_found": false,
+  "duplicate_dog_id": null,
+  "match_score": null,
+  "quality_passed": true,
+  "quality_notes": { "crop_1": { "passed": true, ... }, ... },
+  "embedding_version": 1,
+  "completed_at": "ISO8601 | null"
+}
+```
+
+Terminal `status`:
+- `complete` — check `duplicate_found`. If true and `intent === 'enrollment'`,
+  route to the duplicate-resolution screen with `duplicate_dog_id` + `match_score`.
+- `failed` — `quality_notes` carries per-crop reasons. Show a retry prompt.
+
+If still `processing`, poll every 2–3s (cap ~60s) or just reconnect the SSE stream.
 
 ---
 
@@ -433,16 +493,9 @@ SSE endpoint will replace this whole section once it ships.
 
 ---
 
-## 10. Open items to plan for
+## 10. Notes
 
-These are in the spec (`CLAUDE.md`) but not implemented yet. Hold UX hooks
-for them but stub them out:
-
-- `GET /inference/status/{embedding_job_id}` — SSE stream with `status` /
-  `complete` / `error` events. JWT will be passed as `?token=` query param
-  because React Native's `EventSource` does not support custom headers.
-- `GET /inference/result/{embedding_job_id}` — fallback polling endpoint
-  for dropped SSE connections.
-
-Once those ship, replace the section 7 polling pattern with an SSE
-subscription.
+- Inference runs in an always-on background worker, so terminal status can lag
+  `/inference/start` by a few seconds. Drive the UI off the SSE stream (§7).
+- `duplicate_found` is only ever true for `intent === 'enrollment'`; rescans skip
+  the duplicate check.

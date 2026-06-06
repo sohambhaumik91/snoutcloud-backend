@@ -10,5 +10,16 @@ sentence-transformers==3.0.1
 ulid-py==1.1.0
 httpx==0.27.2
 redis[asyncio]==5.0.8
+arq==0.28.0
 sse-starlette==1.8.2
 PyJWT==2.12.1
+
+# Nose biometrics (ConvNeXt-Tiny + GeM)
+# CPU-only builds — installed in the Dockerfile from the PyTorch CPU index
+# (https://download.pytorch.org/whl/cpu) to skip the ~2.5GB CUDA stack.
+# Inference runs on CPU; do not change to the default wheels without reason.
+torch==2.4.1
+torchvision==0.19.1
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==10.4.0

@@ -1,8 +1,9 @@
 # Discoveries — Nose Biometrics Endpoints (Phase 1)
 
-Notes captured while implementing `POST /registration/start`, `POST /rescan/start`,
-and `POST /inference/start`. Things that surprised me, or where I deviated from
-the spec in `CLAUDE.md`.
+Implementation gotchas captured while building the nose-biometrics endpoints —
+the non-obvious things worth remembering. The canonical pipeline design now
+lives in [`docs/registration.md`](docs/registration.md); this file is just the
+sharp edges.
 
 ## Supabase presigned upload URLs
 

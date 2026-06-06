@@ -1,10 +1,14 @@
-version: "3.9"
-
 services:
   redis:
     image: redis:7-alpine
+    # AOF persistence — survives container restarts. Volume below holds the data.
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    # Bind to loopback only — Redis is reached by api via the docker network,
+    # never directly from the public ngrok tunnel.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -24,3 +28,38 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  # Always-on arq worker. Reuses the api image; only the command differs.
+  # Consumes inference jobs enqueued by the api and runs the nose pipeline.
+  # This is the process that loads the 380MB nose encoder (the api does not).
+  worker:
+    build: .
+    command: ["arq", "app.worker.WorkerSettings"]
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379
+      # The checkpoint is baked into the image (Dockerfile), so just point the
+      # encoder at the baked path. No download, no volume needed.
+      NOSE_MODEL_PATH: /app/models/best_supcon_clahe_gem.pt
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    # Exposes ONLY the api service. Redis is not tunneled.
+    # For a reserved static domain, swap to:
+    #   command: ["http", "--url=your-domain.ngrok-free.app", "api:8000"]
+    command: ["http", "api:8000"]
+    ports:
+      - "4040:4040"  # ngrok inspector UI — shows the public URL at http://localhost:4040
+    depends_on:
+      - api
+
+volumes:
+  redis_data:

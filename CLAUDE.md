@@ -8,6 +8,11 @@ endpoints, SSE status streaming, and ML inference flow.
 
 This is the canonical reference for Claude Code to implement the Railway FastAPI backend.
 
+> **The registration/inference pipeline detail lives in [`docs/registration.md`](docs/registration.md)** —
+> that is the single source of truth for the flow (endpoints, the arq worker, `nose_scan_frames`,
+> `attempt_number`). This file keeps the auth + schema + storage reference and links out for the
+> pipeline so the two don't drift.
+
 ---
 
 ## Technology Stack
@@ -17,9 +22,10 @@ This is the canonical reference for Claude Code to implement the Railway FastAPI
 | Mobile App | React Native + Expo (Dev Client) |
 | Auth | Supabase Auth (OAuth via Google) |
 | Database | Supabase Postgres (pgvector 0.8.0 enabled) |
-| Object Storage | Supabase Storage (`snoutcloud` bucket) |
+| Object Storage | Supabase Storage (`dog_nose_crops` bucket, private) |
 | Backend | FastAPI on Railway |
-| ML Inference | ConvNeXt-Tiny + ArcFace (hosted on Railway or Modal.com) |
+| Job Queue | arq (Redis-backed) — always-on worker process runs inference |
+| ML Inference | ConvNeXt-Tiny encoder (SupCon, GeM pooling) → `VECTOR(384)` |
 | Embedding Store | pgvector on Supabase (`dog_embeddings` table) |
 | SSE | FastAPI `StreamingResponse` → React Native `EventSource` |
 
@@ -139,7 +145,9 @@ CREATE TABLE public.embedding_jobs (
   user_id             UUID NOT NULL REFERENCES public.users(id),
   intent              embedding_job_intent NOT NULL,
   status              embedding_job_status NOT NULL DEFAULT 'pending',
-  storage_path        TEXT NOT NULL,                                          -- path prefix in snoutcloud bucket
+  -- NOTE: the live table has NO storage_path column. The full per-crop path is
+  -- stored on each nose_scan_frames row; the job is resolved to its crops by
+  -- querying nose_scan_frames on job_id.
   duplicate_found     BOOLEAN,
   duplicate_dog_id    UUID REFERENCES public.dogs(id),
   match_score         FLOAT,
@@ -186,7 +194,7 @@ updated_at          TIMESTAMPTZ
 
 ### `dog_embeddings`
 
-Stores versioned ArcFace embeddings per dog. Every enrollment and rescan appends a row.
+Stores versioned nose embeddings (`VECTOR(384)`, ConvNeXt-Tiny / SupCon) per dog. Every enrollment and rescan appends a row.
 `is_active = true` marks the embedding currently used for nearest-neighbour matching.
 
 ```sql
@@ -194,7 +202,7 @@ CREATE TABLE public.dog_embeddings (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   dog_id              UUID NOT NULL REFERENCES public.dogs(id),
   embedding_job_id    UUID NOT NULL REFERENCES public.embedding_jobs(id),
-  embedding           VECTOR(512) NOT NULL,
+  embedding           VECTOR(384) NOT NULL,
   is_active           BOOLEAN NOT NULL DEFAULT true,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -217,7 +225,8 @@ When a rescan completes successfully:
 
 ## Storage Convention
 
-**Bucket:** `snoutcloud` (private, no public access)
+**Bucket:** `dog_nose_crops` (private, no public access). Every object key is prefixed with
+`private/` to satisfy the bucket RLS policy `(storage.foldername(name))[1] = 'private'`.
 
 **Path structure:**
 
@@ -436,61 +445,14 @@ connection drops before the `complete` event is received.
 
 ## Pipeline Internals (`run_pipeline`)
 
-Runs as a FastAPI `BackgroundTask` after `/inference/start` is called.
+Runs in the **always-on arq worker** (`arq app.worker.WorkerSettings`), enqueued
+by `/inference/start`. Not a FastAPI `BackgroundTask` — a job survives a
+web/worker restart.
 
-```
-1. FETCH CROPS
-   └── list files at embedding_jobs.storage_path
-   └── download all 8 crops from snoutcloud bucket using service_role
-
-2. QUALITY GATING (server-side)
-   └── for each crop:
-       ├── check image dimensions (min 224x224)
-       ├── check sharpness (Laplacian variance threshold)
-       ├── check brightness (reject over/underexposed)
-       └── check YOLO nose confidence score if embedded in filename/metadata
-   └── if < 6 crops pass → mark job failed, emit SSE error event
-   └── store per-crop results in embedding_jobs.quality_notes (JSONB)
-   └── emit SSE: { step: "quality_check" }
-
-3. GENERATE EMBEDDINGS
-   └── run ConvNeXt-Tiny + ArcFace on each passing crop
-   └── L2-normalise each embedding
-   └── average all passing crop embeddings → final_embedding (VECTOR 512)
-   └── emit SSE: { step: "generating_embedding" }
-
-4a. IF INTENT == 'enrollment': DUPLICATE CHECK
-   └── query dog_embeddings WHERE is_active = true
-       ORDER BY embedding <=> final_embedding  (cosine distance)
-       LIMIT 5
-   └── if top match score > threshold (e.g. 0.85):
-       ├── set embedding_jobs.duplicate_found = true
-       ├── set embedding_jobs.duplicate_dog_id = matched dog
-       ├── set embedding_jobs.match_score = score
-       ├── update registrations.status = 'possible_duplicate'
-       └── emit SSE complete event with duplicate_found: true
-   └── else: proceed to step 5
-   └── emit SSE: { step: "duplicate_check" }
-
-4b. IF INTENT == 'rescan': SKIP DUPLICATE CHECK
-   └── proceed directly to step 5
-
-5. PERSIST RESULTS
-   └── emit SSE: { step: "saving_results" }
-
-   IF enrollment, no duplicate:
-   ├── create dogs row → get dog_id
-   ├── update embedding_jobs: dog_id, status=complete, completed_at
-   ├── update registrations: dog_id, status=completed
-   ├── insert dog_embeddings: dog_id, embedding_job_id, embedding, is_active=true
-   └── emit SSE complete event
-
-   IF rescan:
-   ├── set existing dog_embeddings.is_active = false WHERE dog_id = X
-   ├── insert dog_embeddings: new row, is_active=true
-   ├── update embedding_jobs: status=complete, embedding_version=N+1, completed_at
-   └── emit SSE complete event
-```
+The full step-by-step (fetch frames from `nose_scan_frames` → quality gate →
+embed `VECTOR(384)` → duplicate check → persist) is documented once, canonically,
+in **[`docs/registration.md`](docs/registration.md)**. It is not duplicated here
+to avoid drift.
 
 ---
 
@@ -591,11 +553,12 @@ CREATE TRIGGER on_auth_user_created
   `user_id` in the request body.
 - Presigned URLs are generated server-side using `service_role_key`. The client uploads
   directly to Supabase Storage — crops never pass through Railway.
-- `embedding_jobs.storage_path` is the single source of truth for where crops live.
+- `embedding_jobs.storage_path` is the prefix; `nose_scan_frames` (keyed by `job_id`) is the
+  source of truth for which crops belong to a job.
 - Only `is_active = true` embeddings are queried during duplicate check and matching.
 - The SSE stream is the primary status delivery mechanism. `/inference/result/{id}` is the
   fallback for dropped connections.
-- `registrations` is touched only during `intent = enrollment`. Rescans only touch
-  `embedding_jobs` and `dog_embeddings`.
+- `registrations` is **one row per scan attempt** — both enrollment AND rescan create one
+  (tracked via `attempt_number`). `embedding_jobs.intent` distinguishes the two.
 - Railway always writes to Supabase using `service_role_key` (bypasses RLS). The mobile
   app uses `anon_key` + RLS for direct Supabase queries.

@@ -328,6 +328,19 @@ class EmbeddingJobStatus(str, Enum):
     FAILED     = "failed"
 
 
+class FrameStatus(str, Enum):
+    """Mirrors the Postgres `frame_status` enum on nose_scan_frames.
+
+    Live enum values: uploaded, processing, selected, rejected.
+    Lifecycle: rows start `uploaded`; the worker marks each `selected` (passed
+    quality + used for embedding) or `rejected` (failed quality gating).
+    """
+    UPLOADED   = "uploaded"
+    PROCESSING = "processing"
+    SELECTED   = "selected"
+    REJECTED   = "rejected"
+
+
 class PresignedUpload(BaseModel):
     index: int
     url: str
@@ -347,6 +360,7 @@ class RescanStartRequest(BaseModel):
 
 
 class RescanStartResponse(BaseModel):
+    registration_id: UUID
     embedding_job_id: UUID
     presigned_urls: list[PresignedUpload]
 
@@ -358,3 +372,15 @@ class InferenceStartRequest(BaseModel):
 class InferenceStartResponse(BaseModel):
     embedding_job_id: UUID
     status: str
+
+
+class DuplicateCandidate(BaseModel):
+    dog_id: UUID
+    name: str
+    breed: str | None = None
+    match_score: float | None = None
+
+
+class ResolveRequest(BaseModel):
+    decision: str          # "new" | "existing"
+    dog_id: UUID | None = None   # required when decision == "existing"
