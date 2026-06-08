@@ -1,8 +1,9 @@
 # Frontend Handoff — Nose Biometrics Enrollment & Rescan
 
-This document is everything a React Native / web client needs to integrate the
-nose-biometrics endpoints, all of which are live today:
+This document is everything the React Native iOS client needs to integrate the
+nose-biometrics endpoints. All endpoints are live on Railway today.
 
+**Endpoints:**
 1. `POST /registration/start` — begin enrolling a new dog
 2. `POST /rescan/start` — re-upload nose crops for an existing dog
 3. `POST /inference/start` — trigger the embedding pipeline
@@ -12,34 +13,23 @@ nose-biometrics endpoints, all of which are live today:
 
 > Inference runs in an always-on background worker; `/inference/start` returns
 > immediately. Subscribe to the SSE stream for live progress and fall back to
-> the result endpoint if the connection drops (see §7).
+> the result endpoint if the connection drops (see §8).
 
 ---
 
 ## 1. Base URL & Authentication
 
 **Base URL** (configure per environment):
-- **Local laptop server via ngrok:** the `https://<random>.ngrok-free.app` URL
-  printed at `http://localhost:4040` after `docker compose up`. It changes every
-  restart on the free tier — update the client's base URL each time, or use a
-  reserved ngrok domain.
-- **Railway:** `https://<your-railway-service>.railway.app`.
+- **Production (Railway):** `https://snoutcloud-backend-production.up.railway.app`
+- **Local via ngrok:** the `https://<random>.ngrok-free.app` URL printed at
+  `http://localhost:4040` after `docker compose up`. Changes every restart on
+  the free tier.
 
-> **ngrok-free gotcha:** the free tier injects a browser-warning interstitial on
-> requests that look like a browser. React Native `fetch`/`EventSource` normally
-> bypass it, but if you see an HTML warning page instead of JSON, add the header
-> `ngrok-skip-browser-warning: 1` to your `fetch` calls. (The SSE `EventSource`
-> can't set headers — if the stream returns HTML, switch to a reserved ngrok
-> domain or deploy to Railway.)
-
-Every request must include the Supabase access token in the `Authorization`
-header:
+Every request must include the Supabase access token in the `Authorization` header:
 
 ```
 Authorization: Bearer <supabase_access_token>
 ```
-
-Get the token from `supabase-js`:
 
 ```ts
 import { supabase } from './supabase'
@@ -48,72 +38,163 @@ const { data: { session } } = await supabase.auth.getSession()
 const accessToken = session?.access_token
 ```
 
-The backend extracts the user id from the JWT `sub` claim. **Never put a
-`user_id` in the request body** — the backend ignores anything you send and
-trusts only the JWT.
+The backend extracts user id from the JWT `sub` claim. **Never put `user_id`
+in request bodies** — it is ignored. Only the JWT is trusted.
 
 ### Token refresh
 
-`supabase-js` refreshes the access token automatically before expiry. If you
-get a `401` response from the backend, call `supabase.auth.refreshSession()`
-and retry the request once.
+If you get a `401`, call `supabase.auth.refreshSession()` and retry once.
+`supabase-js` auto-refreshes before expiry but a `401` can still happen at
+session boundaries.
 
 ---
 
-## 2. End-to-end flow
+## 2. iOS camera capture — image format requirements
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│  Enrollment                                                        │
-│                                                                    │
-│  1. POST /registration/start                                       │
-│     → { registration_id, embedding_job_id, presigned_urls[8],      │
-│         expires_at }                                               │
-│                                                                    │
-│  2. For each presigned_url, PUT the cropped JPEG bytes directly    │
-│     to Supabase Storage (crops do NOT pass through this backend)   │
-│                                                                    │
-│  3. POST /inference/start { embedding_job_id }                     │
-│     → { embedding_job_id, status: "processing" }                   │
-│                                                                    │
-│  4. Subscribe to GET /inference/status/{embedding_job_id} (SSE)    │
-│     for live progress; fall back to GET /inference/result/{id}     │
-│     if the SSE connection drops.                                   │
-└────────────────────────────────────────────────────────────────────┘
+Crops are captured by the iOS camera (auto-capture, not photo library). The
+backend accepts only **JPEG** (`image/jpeg`). Every upload PUT must set
+`Content-Type: image/jpeg`.
 
-┌────────────────────────────────────────────────────────────────────┐
-│  Rescan (existing dog)                                             │
-│                                                                    │
-│  1. POST /rescan/start { dog_id }                                  │
-│     → { embedding_job_id, presigned_urls[8] }                      │
-│                                                                    │
-│  2. Upload crops (same as enrollment step 2)                       │
-│                                                                    │
-│  3. POST /inference/start { embedding_job_id }                     │
-│     (same as enrollment step 3)                                    │
-└────────────────────────────────────────────────────────────────────┘
+### HEIC / HEIF — must convert before upload
+
+iPhones shooting in High Efficiency mode produce HEIC files. The backend
+rejects HEIC. Convert before uploading:
+
+```ts
+import * as ImageManipulator from 'expo-image-manipulator'
+
+async function ensureJpeg(uri: string): Promise<string> {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [],  // no transforms
+    { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
+  )
+  return result.uri  // always a JPEG URI
+}
 ```
 
-The TTL: registration's `expires_at` is **30 minutes** from `/registration/start`.
-The presigned upload URLs themselves remain valid for **~2 hours** (Supabase
-default — not configurable from the SDK). Both clocks start at
-`/registration/start` time, so plan the UX around the 30-minute registration
-window, not the upload window.
+Call `ensureJpeg()` on every camera URI before building the upload body.
+`expo-image-manipulator` is already JPEG-safe on both iOS and Android.
+
+### Recommended camera library
+
+Use `react-native-vision-camera` or `expo-camera`. Both return a local file
+URI. Always pass `quality: 0.92` (or equivalent) and explicitly request JPEG
+output:
+
+```ts
+// react-native-vision-camera example
+const photo = await camera.current.takePhoto({
+  flash: 'off',
+  enableShutterSound: false,
+})
+// photo.path is a file URI — may be HEIC on some devices
+const jpegUri = await ensureJpeg(`file://${photo.path}`)
+```
+
+### Converting URI → fetch-compatible body
+
+```ts
+async function uriToBlob(uri: string): Promise<Blob> {
+  const res = await fetch(uri)
+  return res.blob()
+}
+```
+
+Or use `ReactNativeBlobUtil` / `expo-file-system` for large files if memory is a concern.
+
+### Minimum image requirements
+
+| Property | Minimum |
+|---|---|
+| Width | 224 px |
+| Height | 224 px |
+| Format | JPEG only |
+| Content-Type header | `image/jpeg` |
+
+Images below minimum dimensions are rejected by the quality gate and return an
+`error` SSE event with `reason: "below_min_dim"`. Capture tightly around the
+nose — full-face or body shots will be rejected.
 
 ---
 
-## 3. Endpoint reference
+## 3. End-to-end flow
 
-### 3.1 `POST /registration/start`
+### Enrollment — always ends with a human review step
 
-**Auth**: required.
-**Request body**: none (send `{}` or no body).
+Every enrollment goes through a **review screen** regardless of whether any
+matching dogs are found. The worker never auto-creates a dog. The human always taps to confirm.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Enrollment                                                         │
+│                                                                     │
+│  1. POST /registration/start                                        │
+│     → { registration_id, embedding_job_id, presigned_urls[8],       │
+│         expires_at }                                                │
+│                                                                     │
+│  2. Camera auto-captures 8 nose crops → convert to JPEG             │
+│     PUT each presigned_url with JPEG bytes directly to              │
+│     Supabase Storage (crops do NOT pass through this backend)       │
+│                                                                     │
+│  3. POST /inference/start { embedding_job_id }                      │
+│     → { embedding_job_id, status: "processing" }                    │
+│                                                                     │
+│  4. Subscribe to GET /inference/status/{id}?token=<jwt> (SSE)       │
+│     Worker: quality_check → generating_embedding →                  │
+│             duplicate_check → saving_results                        │
+│                                                                     │
+│  5. SSE emits `review_required` (terminal event):                   │
+│     → { status: "possible_duplicate",                               │
+│         candidates: [{dog_id, name, breed, match_score}, ...] }     │
+│     candidates may be empty — still requires a human tap.           │
+│                                                                     │
+│  6. Show review screen:                                             │
+│     • Candidates present → "Is this one of these dogs?" + buttons  │
+│     • No candidates      → "No records found — complete enrollment" │
+│                                                                     │
+│  7. POST /inference/{embedding_job_id}/resolve                      │
+│     { decision: "new" }          → dog created, registration done   │
+│     { decision: "existing",                                         │
+│       dog_id: "<candidate>" }    → duplicate confirmed, done        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Rescan — no review step
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Rescan (existing dog)                                              │
+│                                                                     │
+│  1. POST /rescan/start { dog_id }                                   │
+│     → { registration_id, embedding_job_id, presigned_urls[8] }      │
+│                                                                     │
+│  2. Camera captures 8 crops → convert to JPEG → upload              │
+│                                                                     │
+│  3. POST /inference/start { embedding_job_id }                      │
+│                                                                     │
+│  4. SSE emits `complete`:                                           │
+│     → { status: "complete", dog_id, embedding_version }             │
+│     No review screen. No duplicate check. Done.                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+The TTL: `expires_at` is **30 minutes** from `/registration/start`. Presigned
+upload URLs are valid for **~2 hours**. Plan UX around the 30-minute window.
+
+---
+
+## 4. Endpoint reference
+
+### 4.1 `POST /registration/start`
+
+**Auth**: required. **Body**: none (`{}` or empty).
+
 **Response 200**:
-
 ```json
 {
-  "registration_id": "ec1a05b8-2f43-4f60-9d54-7c80a5e0d12c",
-  "embedding_job_id": "7e57c4d6-...-...",
+  "registration_id": "ec1a05b8-...",
+  "embedding_job_id": "7e57c4d6-...",
   "presigned_urls": [
     {
       "index": 1,
@@ -129,24 +210,18 @@ window, not the upload window.
 }
 ```
 
-**Errors**:
-- `401` — missing/invalid JWT.
-- `500` — Supabase insert or presigned URL generation failed. Safe to retry;
-  failed inserts are rolled back server-side.
+**Errors**: `401` missing JWT · `500` DB/storage failure (safe to retry).
 
 ---
 
-### 3.2 `POST /rescan/start`
+### 4.2 `POST /rescan/start`
 
-**Auth**: required.
-**Request body**:
-
+**Auth**: required. **Body**:
 ```json
 { "dog_id": "uuid-of-an-existing-dog-you-own" }
 ```
 
 **Response 200**:
-
 ```json
 {
   "registration_id": "...",
@@ -158,126 +233,145 @@ window, not the upload window.
 }
 ```
 
-> A rescan now also creates a `registrations` row (one row per scan attempt,
-> tracked via `attempt_number`), so the response includes `registration_id` for
-> symmetry with enrollment. You generally only need `embedding_job_id` to drive
-> upload + inference + status.
-
-**Errors**:
-- `401` — missing/invalid JWT.
-- `403` — the JWT subject does not own the supplied `dog_id`.
-- `404` — `dog_id` does not exist.
-- `500` — DB / presigned URL failure (safe to retry).
+**Errors**: `401` · `403` user doesn't own dog · `404` dog not found · `500`.
 
 ---
 
-### 3.3 `POST /inference/start`
+### 4.3 `POST /inference/start`
 
-**Auth**: required.
-**Request body**:
-
+**Auth**: required. **Body**:
 ```json
 { "embedding_job_id": "uuid-returned-by-registration-or-rescan" }
 ```
 
-**Response 200** (immediate; pipeline runs async):
-
+**Response 200** (immediate):
 ```json
 { "embedding_job_id": "...", "status": "processing" }
 ```
 
-**Errors**:
-- `401` — missing/invalid JWT.
-- `403` — the job belongs to another user.
-- `404` — `embedding_job_id` does not exist.
-- `400` — the job is not in `pending` state (already processing / complete /
-  failed). The detail string includes the actual status, e.g.
-  `"Embedding job is not pending (current status: processing)"`.
-- `409` — a concurrent `/inference/start` for the same job won the race.
-  Treat the same as `400`: the pipeline is already running, do not retry.
+Only call **after all 8 uploads are complete**.
 
-> Important: only call `/inference/start` **after** all 8 crops have finished
-> uploading. There is no server-side check that the crops are present yet;
-> the pipeline will simply fail or hang.
+**Errors**: `401` · `403` wrong user · `404` · `400` not pending · `409` concurrent call.
 
 ---
 
-## 3.4 Storage bucket reference
+### 4.4 `GET /inference/status/{embedding_job_id}` — SSE
 
-- **Bucket name**: `dog_nose_crops` (private).
-- **Path prefix**: every object key starts with `private/...`. This is
-  required by the bucket's RLS policy:
+Pass JWT as query param — `EventSource` cannot set headers:
+```
+GET /inference/status/{id}?token=<supabase_access_token>
+```
 
-  ```
-  bucket_id = 'dog_nose_crops'
-    AND (storage.foldername(name))[1] = 'private'
-    AND auth.role() = 'authenticated'
-  ```
+**Events:**
 
-  The backend already prepends `private/` to every path it returns, so you do
-  not need to add it yourself. **But**: if you ever construct a path on the
-  client (for direct `supabase.storage.from('dog_nose_crops').download(path)`
-  calls to show crops back to the user), that path must also start with
-  `private/`, and the user must be authenticated in `supabase-js` for the
-  RLS check to pass.
+| Event | Terminal | Payload |
+|---|---|---|
+| `status` | No | `{ status: "processing", step: "quality_check" \| "generating_embedding" \| "duplicate_check" \| "saving_results" \| "starting" }` |
+| `review_required` | **Yes** | `{ status: "possible_duplicate", candidates: DuplicateCandidate[] }` |
+| `complete` | **Yes** | `{ status: "complete", dog_id, embedding_version }` |
+| `error` | **Yes** | `{ status: "failed", reason, passed_count?, required?, notes? }` |
+
+Call `es.close()` on every terminal event. `candidates` may be empty — human tap is still required.
 
 ---
 
-## 4. Uploading crops to Supabase Storage
+### 4.5 `GET /inference/result/{embedding_job_id}` — polling fallback
 
-The backend hands you signed *upload* URLs. Each entry in `presigned_urls`
-has three fields:
+**Auth**: `Authorization: Bearer` header. Use when SSE drops before terminal event.
 
-- `url` — full signed URL (works with plain HTTP `PUT`).
-- `path` — the object key inside the `dog_nose_crops` bucket.
-- `token` — the upload token, also embedded in `url`. Provided separately so
-  you can use the Supabase JS SDK's `uploadToSignedUrl()` helper if you
-  prefer it over raw `fetch`.
+**Response 200**:
+```json
+{
+  "embedding_job_id": "...",
+  "status": "complete | processing | failed",
+  "registration_status": "possible_duplicate | completed | duplicate_confirmed | failed | processing",
+  "intent": "enrollment | rescan",
+  "dog_id": "uuid | null",
+  "duplicate_found": false,
+  "duplicate_dog_id": null,
+  "match_score": null,
+  "quality_passed": true,
+  "quality_notes": { "crop_1": { "passed": true, "reason": "..." }, ... },
+  "embedding_version": 1,
+  "completed_at": "ISO8601 | null",
+  "candidates": [...]
+}
+```
 
-### Option A — raw `fetch` (works in React Native and the browser)
+`candidates` only present when `registration_status === "possible_duplicate"`. Show review screen when you see it.
+
+---
+
+### 4.6 `POST /inference/{embedding_job_id}/resolve`
+
+**Auth**: required.
+
+**Body** (one of):
+```json
+{ "decision": "new" }
+```
+```json
+{ "decision": "existing", "dog_id": "<uuid-of-matched-dog>" }
+```
+
+- `"new"` — creates dog + active embedding. Use when human taps "no match" or empty candidates.
+- `"existing"` — links scan to matched dog. `dog_id` must be from the candidates list. Embedding saved as `is_active=false`.
+
+**Response 200**:
+```json
+{
+  "embedding_job_id": "...",
+  "status": "complete",
+  "registration_status": "completed | duplicate_confirmed",
+  "dog_id": "uuid",
+  "embedding_version": 1
+}
+```
+
+**Errors**: `400` already resolved · `404` no registration · `409` concurrent resolve (`already_resolved`) · `422` bad decision/missing dog_id.
+
+---
+
+## 5. Uploading crops from iOS camera
 
 ```ts
-async function uploadCrop(presigned: { url: string }, blob: Blob) {
-  const res = await fetch(presigned.url, {
+import * as ImageManipulator from 'expo-image-manipulator'
+
+async function ensureJpeg(uri: string): Promise<string> {
+  const result = await ImageManipulator.manipulateAsync(
+    uri, [],
+    { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
+  )
+  return result.uri
+}
+
+async function uploadCrop(presignedUrl: string, jpegUri: string): Promise<void> {
+  // Convert local file URI to a fetch-compatible blob
+  const response = await fetch(jpegUri)
+  const blob = await response.blob()
+
+  const res = await fetch(presignedUrl, {
     method: 'PUT',
     headers: { 'Content-Type': 'image/jpeg' },
     body: blob,
   })
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
 }
-```
 
-### Option B — Supabase JS SDK
-
-```ts
-await supabase
-  .storage
-  .from('dog_nose_crops')
-  .uploadToSignedUrl(presigned.path, presigned.token, blob, {
-    contentType: 'image/jpeg',
-  })
-```
-
-### Uploading all 8 in parallel
-
-```ts
 async function uploadAllCrops(
-  presigned_urls: Array<{ index: number; url: string }>,
-  crops: Blob[]  // length 8, ordered to match index 1..8
-) {
+  presignedUrls: Array<{ index: number; url: string }>,
+  cameraUris: string[]  // length 8, ordered 1..8
+): Promise<void> {
+  const jpegUris = await Promise.all(cameraUris.map(ensureJpeg))
   await Promise.all(
-    presigned_urls.map((p) => uploadCrop(p, crops[p.index - 1]))
+    presignedUrls.map((p) => uploadCrop(p.url, jpegUris[p.index - 1]))
   )
 }
 ```
 
-Show a per-crop progress UI by resolving `Promise.all` against an array of
-individually-tracked promises. If one upload fails, you can retry that crop
-with the same presigned URL — it stays valid for the full 2-hour window.
-
 ---
 
-## 5. Reference TypeScript types
+## 6. Reference TypeScript types
 
 ```ts
 export interface PresignedUpload {
@@ -288,16 +382,16 @@ export interface PresignedUpload {
 }
 
 export interface RegistrationStartResponse {
-  registration_id: string  // uuid
-  embedding_job_id: string // uuid
-  presigned_urls: PresignedUpload[]   // length 8
-  expires_at: string                  // ISO8601
+  registration_id: string
+  embedding_job_id: string
+  presigned_urls: PresignedUpload[]
+  expires_at: string
 }
 
 export interface RescanStartResponse {
-  registration_id: string  // uuid
+  registration_id: string
   embedding_job_id: string
-  presigned_urls: PresignedUpload[]   // length 8
+  presigned_urls: PresignedUpload[]
 }
 
 export interface InferenceStartResponse {
@@ -305,15 +399,70 @@ export interface InferenceStartResponse {
   status: 'processing'
 }
 
-// SSE events on GET /inference/status/{embedding_job_id}?token=<jwt>
-// event: status   → { status: 'processing', step: 'quality_check' | 'generating_embedding' | 'duplicate_check' | 'saving_results' | 'starting' }
-// event: complete → { status: 'complete', duplicate_found, duplicate_dog_id, match_score, dog_id, embedding_version }
-// event: error    → { status: 'failed', reason, notes? }
+export interface DuplicateCandidate {
+  dog_id: string
+  name: string
+  breed: string | null
+  match_score: number | null
+}
+
+export type SseStatusEvent = {
+  status: 'processing'
+  step: 'starting' | 'quality_check' | 'generating_embedding' | 'duplicate_check' | 'saving_results'
+}
+
+export type SseReviewRequiredEvent = {
+  status: 'possible_duplicate'
+  candidates: DuplicateCandidate[]  // may be empty
+}
+
+export type SseCompleteEvent = {
+  status: 'complete'
+  dog_id: string
+  embedding_version: number
+}
+
+export type SseErrorEvent = {
+  status: 'failed'
+  reason: string
+  passed_count?: number
+  required?: number
+  notes?: Record<string, { passed: boolean; reason?: string }>
+}
+
+export interface ResolveRequest {
+  decision: 'new' | 'existing'
+  dog_id?: string  // required when decision === 'existing'
+}
+
+export interface ResolveResponse {
+  embedding_job_id: string
+  status: 'complete'
+  registration_status: 'completed' | 'duplicate_confirmed'
+  dog_id: string
+  embedding_version: number
+}
+
+export interface ResultResponse {
+  embedding_job_id: string
+  status: 'complete' | 'processing' | 'failed'
+  registration_status: string
+  intent: 'enrollment' | 'rescan'
+  dog_id: string | null
+  duplicate_found: boolean | null
+  duplicate_dog_id: string | null
+  match_score: number | null
+  quality_passed: boolean | null
+  quality_notes: Record<string, { passed: boolean; reason?: string }> | null
+  embedding_version: number | null
+  completed_at: string | null
+  candidates?: DuplicateCandidate[]  // only when registration_status === 'possible_duplicate'
+}
 ```
 
 ---
 
-## 6. Minimal end-to-end client
+## 7. Complete enrollment + resolve example
 
 ```ts
 import { supabase } from './supabase'
@@ -323,7 +472,6 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL!
 async function authedFetch(path: string, init: RequestInit = {}) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in')
-
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -332,82 +480,79 @@ async function authedFetch(path: string, init: RequestInit = {}) {
       'Content-Type': 'application/json',
     },
   })
-  if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`${res.status}: ${detail}`)
-  }
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
   return res.json()
 }
 
-export async function enrollDog(crops: Blob[]) {
-  if (crops.length !== 8) throw new Error('Need exactly 8 crops')
+export async function enrollDog(
+  cameraUris: string[],  // 8 URIs from iOS camera, order matches crop index 1..8
+  onStep: (step: string) => void,
+  onReviewRequired: (candidates: DuplicateCandidate[]) => void,
+): Promise<string> {
+  if (cameraUris.length !== 8) throw new Error('Need exactly 8 crops')
 
   // 1. start registration
   const reg: RegistrationStartResponse = await authedFetch(
-    '/registration/start',
-    { method: 'POST', body: '{}' }
+    '/registration/start', { method: 'POST', body: '{}' }
   )
 
-  // 2. upload crops in parallel
-  await Promise.all(
-    reg.presigned_urls.map((p) =>
-      fetch(p.url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'image/jpeg' },
-        body: crops[p.index - 1],
-      }).then((r) => {
-        if (!r.ok) throw new Error(`Crop ${p.index} upload failed: ${r.status}`)
-      })
-    )
-  )
+  // 2. convert to JPEG + upload in parallel
+  await uploadAllCrops(reg.presigned_urls, cameraUris)
 
-  // 3. kick off the pipeline
+  // 3. kick off inference
   await authedFetch('/inference/start', {
     method: 'POST',
     body: JSON.stringify({ embedding_job_id: reg.embedding_job_id }),
   })
 
-  return reg  // contains registration_id + embedding_job_id for tracking
-}
-
-export async function rescanDog(dogId: string, crops: Blob[]) {
-  if (crops.length !== 8) throw new Error('Need exactly 8 crops')
-
-  const r: RescanStartResponse = await authedFetch('/rescan/start', {
-    method: 'POST',
-    body: JSON.stringify({ dog_id: dogId }),
-  })
-
-  await Promise.all(
-    r.presigned_urls.map((p) =>
-      fetch(p.url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'image/jpeg' },
-        body: crops[p.index - 1],
-      }).then((r2) => {
-        if (!r2.ok) throw new Error(`Crop ${p.index} upload failed: ${r2.status}`)
-      })
-    )
+  // 4. SSE — wait for review_required
+  const { data: { session } } = await supabase.auth.getSession()
+  const es = new EventSource(
+    `${API_BASE}/inference/status/${reg.embedding_job_id}?token=${session!.access_token}`
   )
 
-  await authedFetch('/inference/start', {
-    method: 'POST',
-    body: JSON.stringify({ embedding_job_id: r.embedding_job_id }),
+  es.addEventListener('status', (e) => {
+    const { step } = JSON.parse(e.data) as SseStatusEvent
+    onStep(step)
   })
 
-  return r
+  es.addEventListener('review_required', (e) => {
+    const { candidates } = JSON.parse(e.data) as SseReviewRequiredEvent
+    es.close()
+    onReviewRequired(candidates)
+  })
+
+  es.addEventListener('error', (e) => {
+    es.close()
+    const data = JSON.parse((e as MessageEvent).data || '{}') as SseErrorEvent
+    throw new Error(data.reason || 'Pipeline failed')
+  })
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) startPolling(reg.embedding_job_id, onReviewRequired)
+  }
+
+  return reg.embedding_job_id
+}
+
+// Called when human taps a button on the review screen
+export async function resolveEnrollment(
+  embeddingJobId: string,
+  decision: 'new' | 'existing',
+  dogId?: string,
+): Promise<ResolveResponse> {
+  return authedFetch(`/inference/${embeddingJobId}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, ...(dogId ? { dog_id: dogId } : {}) }),
+  })
 }
 ```
 
 ---
 
-## 7. Live status (SSE) + polling fallback
+## 8. SSE + polling fallback
 
-### SSE — `GET /inference/status/{embedding_job_id}?token=<jwt>`
-
-`EventSource` in React Native can't set headers, so pass the Supabase access
-token as the `?token=` query param. The stream emits the current DB state on
-connect, then `status` step events, and closes on `complete` / `error`.
+### SSE
 
 ```ts
 const { data: { session } } = await supabase.auth.getSession()
@@ -416,86 +561,87 @@ const es = new EventSource(
 )
 
 es.addEventListener('status', (e) => {
-  const { step } = JSON.parse(e.data)   // quality_check | generating_embedding | duplicate_check | saving_results
-  updateProgress(step)
+  const { step } = JSON.parse(e.data) as SseStatusEvent
+  updateProgressUI(step)
+})
+
+es.addEventListener('review_required', (e) => {
+  const { candidates } = JSON.parse(e.data) as SseReviewRequiredEvent
+  es.close()
+  showReviewScreen(candidates)  // candidates may be []
 })
 
 es.addEventListener('complete', (e) => {
-  const r = JSON.parse(e.data)
+  // rescan only
+  const { dog_id, embedding_version } = JSON.parse(e.data) as SseCompleteEvent
   es.close()
-  if (r.duplicate_found) showDuplicateScreen(r.duplicate_dog_id, r.match_score)
-  else showSuccess(r.dog_id, r.embedding_version)
+  showSuccess(dog_id, embedding_version)
 })
 
 es.addEventListener('error', (e) => {
+  const data = JSON.parse((e as MessageEvent).data || '{}') as SseErrorEvent
   es.close()
-  // If the connection (not the pipeline) dropped, fall back to the result endpoint.
+  showErrorScreen(data)
 })
-```
 
-### Polling fallback — `GET /inference/result/{embedding_job_id}`
-
-Auth via the normal `Authorization: Bearer` header. Returns the job's terminal
-fields. Use it if the SSE connection drops before `complete`:
-
-```json
-{
-  "embedding_job_id": "...",
-  "status": "complete | processing | failed",
-  "intent": "enrollment | rescan",
-  "dog_id": "uuid | null",
-  "duplicate_found": false,
-  "duplicate_dog_id": null,
-  "match_score": null,
-  "quality_passed": true,
-  "quality_notes": { "crop_1": { "passed": true, ... }, ... },
-  "embedding_version": 1,
-  "completed_at": "ISO8601 | null"
+es.onerror = () => {
+  if (es.readyState === EventSource.CLOSED) startPolling(embeddingJobId)
 }
 ```
 
-Terminal `status`:
-- `complete` — check `duplicate_found`. If true and `intent === 'enrollment'`,
-  route to the duplicate-resolution screen with `duplicate_dog_id` + `match_score`.
-- `failed` — `quality_notes` carries per-crop reasons. Show a retry prompt.
+### Polling fallback
 
-If still `processing`, poll every 2–3s (cap ~60s) or just reconnect the SSE stream.
+```ts
+async function startPolling(
+  embeddingJobId: string,
+  onReviewRequired: (c: DuplicateCandidate[]) => void,
+  maxMs = 60_000,
+) {
+  const deadline = Date.now() + maxMs
+  while (Date.now() < deadline) {
+    const r: ResultResponse = await authedFetch(`/inference/result/${embeddingJobId}`)
+    if (r.status === 'complete' && r.registration_status === 'possible_duplicate') {
+      onReviewRequired(r.candidates ?? [])
+      return
+    }
+    if (r.status === 'complete') { showSuccess(r.dog_id!, r.embedding_version!); return }
+    if (r.status === 'failed') { showErrorScreen(r); return }
+    await new Promise((res) => setTimeout(res, 2500))
+  }
+  throw new Error('poll timeout')
+}
+```
 
 ---
 
-## 8. Error-handling checklist
+## 9. Error-handling checklist
 
 | Case | What to do |
 |---|---|
-| `401` from any endpoint | Refresh session via `supabase.auth.refreshSession()`, retry once. If it still fails, kick the user back to login. |
-| `403` on `/rescan/start` | The user does not own that dog. Should not happen if you only show their dogs in the UI — treat as a bug and log it. |
-| `403` on `/inference/start` | Same: bug. The job was created under a different user; do not retry. |
-| `404` on `/rescan/start` or `/inference/start` | Stale id (e.g. cached from a prior session). Refresh the dog/job list and re-prompt. |
-| `400` on `/inference/start` | The job is already past `pending`. Skip straight to the polling/SSE wait — do not re-call `/inference/start`. |
-| `409` on `/inference/start` | A concurrent call won the race. Same handling as `400`. |
-| `500` | Show a generic retry prompt. `/registration/start` and `/rescan/start` are safe to retry (rolled back server-side on partial failure). |
-| Upload `PUT` fails | Retry the specific failing crop with the same presigned URL. |
-| Registration window expired (30 min after `/registration/start`) | Restart from `/registration/start`; presigned URLs are scoped to a specific job. |
+| `401` from any endpoint | `supabase.auth.refreshSession()`, retry once. Still failing → redirect to login. |
+| `403` on `/rescan/start` | User doesn't own that dog. Log as bug — should not happen in correct UI. |
+| `403` on `/inference/start` or `/resolve` | Same. Do not retry. |
+| `404` on `/rescan/start` or `/inference/start` | Stale id. Re-fetch dog/job list and re-prompt. |
+| `400` on `/inference/start` | Job already past pending. Skip to SSE/poll wait. |
+| `409` on `/inference/start` | Concurrent call won race. Same as `400`. |
+| `409` on `/resolve` (`already_resolved`) | Concurrent resolve won. Fetch `/inference/result/{id}` and show outcome. |
+| `422` on `/resolve` | Bad decision value or missing `dog_id`. Fix request. |
+| `error` SSE with `reason: "quality_check_failed"` | Crops too blurry, dark, or small. Show retry prompt with `notes` breakdown. |
+| `error` SSE with `reason: "below_min_dim"` | Crop dimensions too small (< 224px). Ask user to re-capture closer to the nose. |
+| `500` | Generic retry. `/registration/start` and `/rescan/start` are safe to retry. |
+| Upload `PUT` fails | Retry that crop using the same presigned URL (valid 2h). |
+| Registration expired (30 min) | Restart from `/registration/start`. |
+| HEIC upload rejected | Run `ensureJpeg()` before upload (see §2). |
 
 ---
 
-## 9. Key invariants the frontend must respect
+## 10. Key invariants
 
-- Exactly **8 crops**, indexed 1..8. Match each crop to its `presigned_urls[i].index`.
-- Each crop is a JPEG. Set `Content-Type: image/jpeg` on the upload `PUT`.
-- Do not include any `user_id` in request bodies. The backend derives it from
-  the JWT `sub` and would ignore yours.
-- Only call `/inference/start` once per `embedding_job_id`. The backend
-  enforces this (400/409), but avoid the wasted round trip.
-- A single `embedding_job_id` ↔ a single set of 8 crops ↔ a single pipeline
-  run. To re-try a failed run you must create a brand-new job via
-  `/registration/start` or `/rescan/start`.
-
----
-
-## 10. Notes
-
-- Inference runs in an always-on background worker, so terminal status can lag
-  `/inference/start` by a few seconds. Drive the UI off the SSE stream (§7).
-- `duplicate_found` is only ever true for `intent === 'enrollment'`; rescans skip
-  the duplicate check.
+- Exactly **8 crops**, indexed 1..8. Match each to `presigned_urls[i].index`.
+- All crops must be **JPEG**. Always run `ensureJpeg()` on iOS camera output before uploading.
+- Set `Content-Type: image/jpeg` on every upload `PUT`.
+- Never put `user_id` in request bodies — extracted from JWT only.
+- Call `/inference/start` exactly once per `embedding_job_id`.
+- Every enrollment ends at the review screen — there is no auto-enroll path.
+- `review_required` is enrollment-only. Rescans emit `complete` directly.
+- `candidates` in `review_required` may be empty — human tap still required.
