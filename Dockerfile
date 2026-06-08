@@ -18,10 +18,9 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 # Download the nose-encoder checkpoint (~380MB) from HuggingFace at build time.
 # Kept in its OWN layer so editing app code doesn't re-download on every build.
 # Repo: https://huggingface.co/mldawg/nosedetectorv1
-ARG HF_TOKEN
 RUN mkdir -p models && \
     pip install -q huggingface_hub && \
-    python -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='mldawg/nosedetectorv1', filename='best_supcon_clahe_gem.pt', local_dir='models', token='${HF_TOKEN}')"
+    python -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='mldawg/nosedetectorv1', filename='best_supcon_clahe_gem.pt', local_dir='models')"
 
 # App code last — small, changes often, kept off the heavy layers above.
 COPY app/ ./app/
