@@ -5,7 +5,6 @@ from app.api.routes import (
     registration,
     rescan,
     inference,
-    dogs,
 )
 from app.services.redis_client import get_redis
 from app.services.embedding import get_model
@@ -56,7 +55,6 @@ app.add_middleware(
 app.include_router(registration.router)
 app.include_router(rescan.router)
 app.include_router(inference.router)
-app.include_router(dogs.router)
 
 
 @app.get("/health")
