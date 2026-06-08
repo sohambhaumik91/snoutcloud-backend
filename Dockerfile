@@ -15,12 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # so the first request doesn't pay the download cost
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
-# Bake the nose-encoder checkpoint (~380MB) into the image, in its OWN layer so
-# editing app code doesn't re-copy it on every build. Place the file at
-# snoutcloud-backend/models/best_supcon_clahe_gem.pt before building — the build
-# fails fast if it's missing. (Baked because Supabase Storage caps uploads at
-# 50MB, so download-at-startup isn't viable for the 380MB checkpoint.)
-COPY models/best_supcon_clahe_gem.pt ./models/best_supcon_clahe_gem.pt
+# Download the nose-encoder checkpoint (~380MB) from HuggingFace at build time.
+# Kept in its OWN layer so editing app code doesn't re-download on every build.
+# Repo: https://huggingface.co/mldawg/nosedetectorv1
+ARG HF_TOKEN
+RUN mkdir -p models && \
+    pip install -q huggingface_hub && \
+    python -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='mldawg/nosedetectorv1', filename='best_supcon_clahe_gem.pt', local_dir='models', token='${HF_TOKEN}')"
 
 # App code last — small, changes often, kept off the heavy layers above.
 COPY app/ ./app/
