@@ -379,6 +379,7 @@ class DuplicateCandidate(BaseModel):
     name: str
     breed: str | None = None
     match_score: float | None = None
+    photo_url: str | None = None
 
 
 class ResolveRequest(BaseModel):

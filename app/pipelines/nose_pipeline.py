@@ -121,9 +121,10 @@ def _query_candidates(sb, embedding: list[float], threshold: float, count: int) 
     if not rows:
         return []
 
-    # Enrich with dog name/breed via a single IN query
+    # Enrich with dog name/breed and main profile photo via single IN queries
     dog_ids = [r["dog_id"] for r in rows if r.get("dog_id")]
     dogs_by_id: dict[str, dict] = {}
+    photos_by_dog: dict[str, str] = {}
     if dog_ids:
         try:
             dogs_res = sb.table("dogs").select("id, name, breed").in_("id", dog_ids).execute()
@@ -131,6 +132,20 @@ def _query_candidates(sb, embedding: list[float], threshold: float, count: int) 
                 dogs_by_id[d["id"]] = d
         except Exception:
             logger.exception("failed to enrich candidates with dog name/breed")
+        try:
+            photos_res = (
+                sb.table("dog_photos")
+                .select("dog_id, storage_path")
+                .in_("dog_id", dog_ids)
+                .eq("slot", "main")
+                .execute()
+            )
+            for p in (photos_res.data or []):
+                photos_by_dog[p["dog_id"]] = (
+                    sb.storage.from_("dog-photos").get_public_url(p["storage_path"])
+                )
+        except Exception:
+            logger.exception("failed to fetch profile photos for candidates")
 
     return [
         {
@@ -138,6 +153,7 @@ def _query_candidates(sb, embedding: list[float], threshold: float, count: int) 
             "name": dogs_by_id.get(r["dog_id"], {}).get("name") or "Unknown",
             "breed": dogs_by_id.get(r["dog_id"], {}).get("breed"),
             "match_score": float(r["similarity"]) if r.get("similarity") is not None else None,
+            "photo_url": photos_by_dog.get(r["dog_id"]),
         }
         for r in rows
         if r.get("dog_id")
@@ -245,6 +261,7 @@ async def run_pipeline(embedding_job_id: UUID) -> None:
                 "status": EmbeddingJobStatus.COMPLETE.value,
                 "pending_embedding": embedding_list,
                 "duplicate_found": bool(candidates),
+                "top_matches": candidates or None,
                 "quality_passed": True,
                 "quality_notes": quality_notes,
                 "embedding_version": 1,
