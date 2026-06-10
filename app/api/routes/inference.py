@@ -22,7 +22,7 @@ from app.core.models import (
     ResolveRequest,
 )
 from app.db.client import get_supabase
-from app.pipelines.nose_pipeline import inference_channel, _query_candidates
+from app.pipelines.nose_pipeline import inference_channel
 from app.services.queue import enqueue_inference
 from app.services.redis_client import get_redis
 
@@ -56,7 +56,7 @@ def _job_for_user(embedding_job_id: UUID, user_id: str) -> dict:
             .select(
                 "id, user_id, dog_id, intent, status, duplicate_found, "
                 "duplicate_dog_id, match_score, quality_passed, quality_notes, "
-                "embedding_version, completed_at, pending_embedding"
+                "embedding_version, completed_at, pending_embedding, top_matches"
             )
             .eq("id", str(embedding_job_id))
             .limit(1)
@@ -88,25 +88,6 @@ def _get_reg_for_job(embedding_job_id: UUID) -> dict | None:
     data = res.data or []
     return data[0] if data else None
 
-
-def _candidates_from_job(job: dict) -> list[dict]:
-    """Re-run top-N pgvector search using the job's pending_embedding."""
-    pending = job.get("pending_embedding")
-    if not pending:
-        return []
-    # Supabase may return vector as string or list
-    if isinstance(pending, str):
-        try:
-            pending = json.loads(pending)
-        except Exception:
-            return []
-    sb = get_supabase()
-    return _query_candidates(
-        sb,
-        pending,
-        settings.duplicate_suggest_threshold,
-        settings.duplicate_candidate_count,
-    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -227,8 +208,7 @@ async def status_stream(
         if initial_status == EmbeddingJobStatus.COMPLETE.value:
             reg = _get_reg_for_job(embedding_job_id)
             if reg and reg.get("status") == "possible_duplicate":
-                candidates = _candidates_from_job(row)
-                fast_event = ("review_required", {"status": "possible_duplicate", "candidates": candidates})
+                fast_event = ("review_required", {"status": "possible_duplicate", "candidates": row.get("top_matches") or []})
             else:
                 fast_event = ("complete", {
                     "status": "complete",
@@ -335,7 +315,7 @@ async def get_result(
     }
 
     if reg_status == "possible_duplicate":
-        result["candidates"] = _candidates_from_job(row)
+        result["candidates"] = row.get("top_matches") or []
 
     return result
 
