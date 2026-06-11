@@ -24,7 +24,7 @@ from app.core.models import (
 from app.db.client import get_supabase
 from app.pipelines.nose_pipeline import inference_channel
 from app.services.queue import enqueue_inference
-from app.services.redis_client import get_redis
+from app.services.redis_client import get_redis, publish
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/inference", tags=["inference"])
@@ -419,6 +419,15 @@ async def resolve_enrollment(
             "updated_at": now_iso,
         }).eq("registration_id", str(reg_id)).execute()
 
+        await publish(inference_channel(embedding_job_id), {
+            "type": "complete",
+            "data": {
+                "status": "complete",
+                "dog_id": new_dog_id,
+                "embedding_version": job.get("embedding_version"),
+            },
+        })
+
         return {
             "embedding_job_id": str(embedding_job_id),
             "status": EmbeddingJobStatus.COMPLETE.value,
@@ -451,10 +460,39 @@ async def resolve_enrollment(
         "updated_at": now_iso,
     }).eq("registration_id", str(reg_id)).execute()
 
+    await publish(inference_channel(embedding_job_id), {
+        "type": "complete",
+        "data": {
+            "status": "complete",
+            "dog_id": dog_id,
+            "embedding_version": job.get("embedding_version"),
+        },
+    })
+
     return {
         "embedding_job_id": str(embedding_job_id),
         "status": EmbeddingJobStatus.COMPLETE.value,
         "registration_status": "duplicate_confirmed",
         "dog_id": dog_id,
         "embedding_version": job.get("embedding_version"),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /inference/{id}/matches  — fetch stored top matches for a job
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{embedding_job_id}/matches")
+async def get_matches(
+    embedding_job_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+) -> dict:
+    """Return the top_matches persisted on the embedding job.
+
+    Returns an empty list for rescan jobs (no duplicate check is run).
+    """
+    row = _job_for_user(embedding_job_id, str(user_id))
+    return {
+        "embedding_job_id": str(embedding_job_id),
+        "top_matches": row.get("top_matches") or [],
     }
